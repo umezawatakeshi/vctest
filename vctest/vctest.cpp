@@ -1,3 +1,6 @@
+/* 文字コードはＳＪＩＳ 改行コードはＣＲＬＦ */
+/* $Id$ */
+
 /*
  * vctest.cpp
  * Copyright (C) 2008-2013  梅澤 威志
@@ -9,11 +12,6 @@
  * 同梱されている getopt.c は NetBSD 由来のもの (src/lib/libc/stdlib/getopt.c 1.28) で、
  * Visual C++ でコンパイルできるように多少修正してあります。
  * getopt.c は BSD ライセンスが適用されます。
- */
-
-/*
- * to compile:
- *   cl /EHsc /MT /Fevctest.exe vctest.cpp getopt.c vfw32.lib
  */
 
 #define _CRT_SECURE_NO_WARNINGS
