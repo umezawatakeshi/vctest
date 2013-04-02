@@ -208,7 +208,12 @@ int main(int argc, char **argv)
 					/* NOTREACHED */
 				}
 				fprintf(stderr, "changing process affinity mask from 0x%X to 0x%X\n", dwpProcessAffinityMask, dwpProcessAffinityMask & a);
-				SetProcessAffinityMask(GetCurrentProcess(), dwpProcessAffinityMask & a);
+				if (!SetProcessAffinityMask(GetCurrentProcess(), dwpProcessAffinityMask & a))
+				{
+					fprintf(stderr, "%s: failed to set affinity mask -- %s\n", getprogname(), optarg);
+					usage();
+					/* NOTREACHED */
+				}
 			}
 			break;
 		case 'c':
