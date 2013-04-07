@@ -380,8 +380,6 @@ void BenchmarkCodec(const char *filename)
 	ICClose(hicDecompress);
 	AVIStreamRelease(pStream);
 
-	AVIFileExit();
-
 	printf("\n");
 
 	printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
@@ -470,6 +468,8 @@ int main(int argc, char **argv)
 	SelectCodec(argv[0]);
 
 	BenchmarkCodec(argv[0]);
+
+	AVIFileExit();
 
 	return 0;
 }
