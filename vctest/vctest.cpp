@@ -230,12 +230,6 @@ void SelectCodec(const char *filename)
 	hr = AVIStreamReadFormat(pStream, 0, pbmihOrig, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	AVIStreamInfo(pStream, &asi, sizeof(asi));
-	printf("frame count       = %d\n", asi.dwLength);
-	printf("frame rate        = %d/%d = %f fps\n", asi.dwRate, asi.dwScale, (double)asi.dwRate/(double)asi.dwScale);
-
-	FCC2String(buf, pbmihOrig->biCompression);
-	printf("source fcc        = %s (%08X)\n", buf, pbmihOrig->biCompression);
-	printf("source bitcount   = %d\n", pbmihOrig->biBitCount);
 
 	if (dwHandler == -1)
 	{
