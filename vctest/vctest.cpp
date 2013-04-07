@@ -276,6 +276,7 @@ void BenchmarkCodec(const char *filename)
 	LARGE_INTEGER liStartEncode, liEndEncode;
 	LARGE_INTEGER liStartDecode, liEndDecode;
 	DWORD dw;
+	LRESULT lr;
 	__declspec(align(4096)) static char bufOrig[1024*1024*12];
 	__declspec(align(4096)) static char *bufEncoded = (char *)VirtualAlloc(NULL, 1024*1024*13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	VirtualProtect(bufEncoded + 1024*1024*12, 1024*1024, PAGE_NOACCESS, &dw);
@@ -310,25 +311,25 @@ void BenchmarkCodec(const char *filename)
 	if (hicCompress == NULL) { printf("ICOpen() failed\n"); }
 	if (cbState > 0)
 	{
-		dw = ICSetState(hicCompress, pState, cbState);
-		if (dw == 0) { printf("ICSetState() failed\n"); }
+		lr = ICSetState(hicCompress, pState, cbState);
+		if (lr == 0) { printf("ICSetState() failed\n"); }
 	}
 	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
-	dw = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
-	if (dw != ICERR_OK) { printf("ICCompressGetFormat() failed  dw=%08x\n", dw); }
+	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
+	if (dw != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
 	pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 	memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
 
-	dw = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
-	if (dw != ICERR_OK) { printf("ICCompressBegin() failed  dw=%08x\n", dw); }
-	dw = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
-	if (dw != ICERR_OK) { printf("ICDecompressBegin() failed  dw=%08x\n", dw); }
+	lr = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
+	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%p\n", lr); }
+	lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
+	if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%p\n", lr); }
 
-	for (int i = 0; i < asi.dwLength; i ++)
+	for (unsigned int i = 0; i < asi.dwLength; i ++)
 	{
 		double etime, dtime;
 		DWORD cbRead;
@@ -369,7 +370,7 @@ void BenchmarkCodec(const char *filename)
 		cbEncodedTotal += pbmihEncoded->biSizeImage;
 		enctime.push_back(etime);
 		dectime.push_back(dtime);
-		iskey.push_back(dwAviIndexFlag&AVIIF_KEYFRAME);
+		iskey.push_back((dwAviIndexFlag&AVIIF_KEYFRAME) != 0);
 		totalenctime += etime;
 		totaldectime += dtime;
 	}
@@ -390,7 +391,7 @@ void BenchmarkCodec(const char *filename)
 	vector<double> ratime;
 	double totalratime = 0;
 
-	for (int i = 0; i < asi.dwLength; i ++)
+	for (unsigned int i = 0; i < asi.dwLength; i ++)
 	{
 		double t = 0;
 		for (int j = i; j >= 0; j--)
@@ -410,37 +411,37 @@ void BenchmarkCodec(const char *filename)
 	printf("Encode time: %fms/%df = %fms/f = %f fps\n", totalenctime, asi.dwLength, totalenctime/asi.dwLength, 1000.0*asi.dwLength/totalenctime);
 	if (vopt)
 	{
-		printf("    min  %f\n", enctime[0]);
-		printf("    10%%  %f\n", enctime[enctime.size()*0.10]);
-		printf("    25%%  %f\n", enctime[enctime.size()*0.25]);
-		printf("    50%%  %f\n", enctime[enctime.size()*0.50]);
-		printf("    75%%  %f\n", enctime[enctime.size()*0.75]);
-		printf("    90%%  %f\n", enctime[enctime.size()*0.90]);
-		printf("    max  %f\n", enctime[enctime.size()-1]);
+		printf("    min  %f\n",  enctime[0]);
+		printf("    10%%  %f\n", enctime[(size_t)(enctime.size()*0.10)]);
+		printf("    25%%  %f\n", enctime[(size_t)(enctime.size()*0.25)]);
+		printf("    50%%  %f\n", enctime[(size_t)(enctime.size()*0.50)]);
+		printf("    75%%  %f\n", enctime[(size_t)(enctime.size()*0.75)]);
+		printf("    90%%  %f\n", enctime[(size_t)(enctime.size()*0.90)]);
+		printf("    max  %f\n",  enctime[(size_t)(enctime.size()-1)]);
 	}
 
 	printf("Decode time: %fms/%df = %fms/f = %f fps\n", totaldectime, asi.dwLength, totaldectime/asi.dwLength, 1000.0*asi.dwLength/totaldectime);
 	if (vopt)
 	{
-		printf("    min  %f\n", dectime[0]);
-		printf("    10%%  %f\n", dectime[dectime.size()*0.10]);
-		printf("    25%%  %f\n", dectime[dectime.size()*0.25]);
-		printf("    50%%  %f\n", dectime[dectime.size()*0.50]);
-		printf("    75%%  %f\n", dectime[dectime.size()*0.75]);
-		printf("    90%%  %f\n", dectime[dectime.size()*0.90]);
-		printf("    max  %f\n", dectime[dectime.size()-1]);
+		printf("    min  %f\n",  dectime[0]);
+		printf("    10%%  %f\n", dectime[(size_t)(dectime.size()*0.10)]);
+		printf("    25%%  %f\n", dectime[(size_t)(dectime.size()*0.25)]);
+		printf("    50%%  %f\n", dectime[(size_t)(dectime.size()*0.50)]);
+		printf("    75%%  %f\n", dectime[(size_t)(dectime.size()*0.75)]);
+		printf("    90%%  %f\n", dectime[(size_t)(dectime.size()*0.90)]);
+		printf("    max  %f\n",  dectime[(size_t)(dectime.size()-1)]);
 	}
 
 	printf("Random access time: %fms/f\n", totalratime/asi.dwLength);
 	if (vopt)
 	{
-		printf("    min  %f\n", ratime[0]);
-		printf("    10%%  %f\n", ratime[ratime.size()*0.10]);
-		printf("    25%%  %f\n", ratime[ratime.size()*0.25]);
-		printf("    50%%  %f\n", ratime[ratime.size()*0.50]);
-		printf("    75%%  %f\n", ratime[ratime.size()*0.75]);
-		printf("    90%%  %f\n", ratime[ratime.size()*0.90]);
-		printf("    max  %f\n", ratime[ratime.size()-1]);
+		printf("    min  %f\n",  ratime[0]);
+		printf("    10%%  %f\n", ratime[(size_t)(ratime.size()*0.10)]);
+		printf("    25%%  %f\n", ratime[(size_t)(ratime.size()*0.25)]);
+		printf("    50%%  %f\n", ratime[(size_t)(ratime.size()*0.50)]);
+		printf("    75%%  %f\n", ratime[(size_t)(ratime.size()*0.75)]);
+		printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
+		printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
 	}
 }
 
