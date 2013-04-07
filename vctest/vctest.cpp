@@ -149,6 +149,7 @@ DWORD cbState = 0;
 void *pState = NULL;
 LARGE_INTEGER liFreq;
 LONG nKeyFrameInterval = 0;
+BOOL bStdOutConsole;
 
 void ParseOption(int &argc, char **&argv)
 {
@@ -359,7 +360,10 @@ void BenchmarkCodec(const char *filename)
 		DWORD cbRead;
 		DWORD dwAviIndexFlag;
 
-		printf("\r%5d/%5d", i, asi.dwLength);
+		if (bStdOutConsole)
+			printf("\r");
+		if (!qopt || bStdOutConsole)
+			printf("%5d/%5d", i, asi.dwLength);
 		fflush(stdout);
 
 		//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
@@ -410,7 +414,7 @@ void BenchmarkCodec(const char *filename)
 
 	if (!qopt)
 		printf("\n");
-	else
+	else if (bStdOutConsole)
 		printf("\r");
 
 	printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
@@ -481,6 +485,10 @@ void BenchmarkCodec(const char *filename)
 
 int main(int argc, char **argv)
 {
+	DWORD dw;
+
+	bStdOutConsole = GetConsoleMode(GetStdHandle(STD_OUTPUT_HANDLE), &dw); // 正常終了すればコンソールのはず
+
 	ParseOption(argc, argv);
 
 	if (argc != 1)
