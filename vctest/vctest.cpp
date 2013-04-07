@@ -152,8 +152,16 @@ void ParseOption(int &argc, char **&argv)
 		{
 		case 'a':
 			{
-				unsigned long a = strtoul(optarg, NULL, 0);
-				if (a == ULONG_MAX && errno == ERANGE)
+				DWORD_PTR a;
+				char *endptr;
+
+				errno = 0;
+#ifdef _WIN64
+				a = _strtoui64(optarg, &endptr, 0);
+#else
+				a = strtoul(optarg, &endptr, 0);
+#endif
+				if (*endptr != '\0' || errno == ERANGE)
 				{
 					fprintf(stderr, "%s: unknown affinity mask -- %s\n", getprogname(), optarg);
 					usage();
