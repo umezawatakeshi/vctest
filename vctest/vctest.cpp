@@ -308,6 +308,8 @@ void BenchmarkCodec(const char *filename)
 	printf("source fcc        = %s (%08X)\n", buf, pbmihOrig->biCompression);
 	printf("source bitcount   = %d\n", pbmihOrig->biBitCount);
 
+	printf("\n");
+
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	ScanChunk();
 
@@ -339,6 +341,9 @@ void BenchmarkCodec(const char *filename)
 		DWORD cbRead;
 		DWORD dwAviIndexFlag;
 
+		printf("\r%5d/%5d", i, asi.dwLength);
+		fflush(stdout);
+
 		//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
 		//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
 		pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
@@ -360,8 +365,8 @@ void BenchmarkCodec(const char *filename)
 		dtime = (liEndDecode.QuadPart - liStartDecode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
 		if (!qopt)
 		{
-			printf("%5d/%5d %10.6fms %10.6fms %7dbytes (%4.1f%%) %s\n",
-				i, asi.dwLength, etime, dtime,
+			printf(" %10.6fms %10.6fms %7dbytes (%4.1f%%) %s\n",
+				etime, dtime,
 				pbmihEncoded->biSizeImage, (double)pbmihEncoded->biSizeImage / (double)pbmihOrig->biSizeImage * 100.0,
 				(pbmihEncoded->biSizeImage == 0) ? "NUL" : (dwAviIndexFlag&AVIIF_KEYFRAME) ? "KEY" : "");
 		}
@@ -385,7 +390,10 @@ void BenchmarkCodec(const char *filename)
 	ICClose(hicDecompress);
 	AVIStreamRelease(pStream);
 
-	printf("\n");
+	if (!qopt)
+		printf("\n");
+	else
+		printf("\r");
 
 	printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
 		cbEncodedTotal, cbOrigTotal,
@@ -459,10 +467,6 @@ int main(int argc, char **argv)
 		/* NOTREACHED */
 	}
 
-	printf("lossless checking = %s\n", bCheckLossless ? "enabled" : "disabled");
-
-	printf("\n");
-
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 
 	InitFlushCache();
@@ -471,6 +475,8 @@ int main(int argc, char **argv)
 	AVIFileInit();
 
 	SelectCodec(argv[0]);
+
+	printf("\n");
 
 	BenchmarkCodec(argv[0]);
 
