@@ -106,7 +106,6 @@ void ScanChunk(void)
 
 char *pRandomBuf;
 #define RANDOMBUFSIZE (16*1024*1024)
-volatile char ch;
 
 void InitFlushCache(void)
 {
@@ -117,6 +116,8 @@ void InitFlushCache(void)
 
 void FlushCache(void)
 {
+	static volatile char ch;
+
 	for (DWORD_PTR mask = 1; mask != 0; mask <<= 1)
 	{
 		if (SetThreadAffinityMask(GetCurrentThread(), mask) != 0)
