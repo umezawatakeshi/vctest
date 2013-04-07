@@ -24,7 +24,15 @@
 #include <windows.h>
 #include <vfw.h>
 
+#define ALLOCUNIT (64*1024)
+#define GUARDSIZE (1024*1024)
+
 using namespace std;
+
+inline size_t ROUNDUP(size_t a, size_t b)
+{
+	return ((a + b - 1) / b) * b;
+}
 
 DWORD_PTR dwpProcessAffinityMask, dwpSystemAffinityMask;
 
@@ -280,11 +288,9 @@ void BenchmarkCodec(const char *filename)
 	LARGE_INTEGER liStartDecode, liEndDecode;
 	DWORD dw;
 	LRESULT lr;
-	__declspec(align(4096)) static char bufOrig[1024*1024*12];
-	__declspec(align(4096)) static char *bufEncoded = (char *)VirtualAlloc(NULL, 1024*1024*13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	VirtualProtect(bufEncoded + 1024*1024*12, 1024*1024, PAGE_NOACCESS, &dw);
-	fprintf(stderr, "bufEncoded = %p bufEncoded-last = %p\n", bufEncoded, bufEncoded+1024*1024*12);
-	__declspec(align(4096)) static char bufDecoded[1024*1024*12];
+	__declspec(align(4096)) char *bufOrig;
+	__declspec(align(4096)) char *bufEncoded;
+	__declspec(align(4096)) char *bufDecoded;
 	unsigned __int64 cbOrigTotal = 0;
 	unsigned __int64 cbEncodedTotal = 0;
 	vector<double> enctime;
@@ -310,6 +316,14 @@ void BenchmarkCodec(const char *filename)
 
 	printf("\n");
 
+	size_t cbOrigBuf = ROUNDUP(pbmihOrig->biSizeImage, ALLOCUNIT);
+	bufOrig = (char *)VirtualAlloc(NULL, cbOrigBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
+	VirtualProtect(bufOrig - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
+	VirtualProtect(bufOrig + cbOrigBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
+	bufDecoded = (char *)VirtualAlloc(NULL, cbOrigBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
+	VirtualProtect(bufDecoded - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
+	VirtualProtect(bufDecoded + cbOrigBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
+
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	ScanChunk();
 
@@ -324,6 +338,10 @@ void BenchmarkCodec(const char *filename)
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
 	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
+	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
+	bufEncoded = (char *)VirtualAlloc(NULL, cbEncodedBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
+	VirtualProtect(bufEncoded - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
+	VirtualProtect(bufEncoded + cbEncodedBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
@@ -355,7 +373,7 @@ void BenchmarkCodec(const char *filename)
 		QueryPerformanceCounter(&liEndEncode);
 		if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
 		char *pEncodedNew = bufEncoded;// + (1024*1024*12) - pbmihEncoded->biSizeImage;
-		memmove(pEncodedNew, bufEncoded, pbmihEncoded->biSizeImage);
+		//memmove(pEncodedNew, bufEncoded, pbmihEncoded->biSizeImage);
 		FlushCache();
 		QueryPerformanceCounter(&liStartDecode);
 		dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, pEncodedNew, pbmihDecoded, bufDecoded);
@@ -455,6 +473,10 @@ void BenchmarkCodec(const char *filename)
 		printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
 		printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
 	}
+
+	VirtualFree(bufOrig - GUARDSIZE, 0, MEM_RELEASE);
+	VirtualFree(bufEncoded - GUARDSIZE, 0, MEM_RELEASE);
+	VirtualFree(bufDecoded - GUARDSIZE, 0, MEM_RELEASE);
 }
 
 int main(int argc, char **argv)
