@@ -44,13 +44,6 @@ void FCC2String(char *buf, DWORD fcc)
 
 HANDLE hFile;
 vector<pair<LARGE_INTEGER, DWORD> > aviindex;
-vector<double> enctime;
-vector<double> dectime;
-vector<bool> iskey;
-double totalenctime = 0;
-double totaldectime = 0;
-LARGE_INTEGER liTotalOrigSize;
-LARGE_INTEGER liTotalEncSize;
 
 
 DWORD ScanSubChunk(void)
@@ -140,52 +133,18 @@ void usage(void)
 	exit(1);
 }
 
-int main(int argc, char **argv)
+DWORD dwHandler = -1;
+BOOL bCheckLossless = FALSE;
+int qopt = 0;
+int vopt = 0;
+DWORD cbState = 0;
+void *pState = NULL;
+LARGE_INTEGER liFreq;
+LONG nKeyFrameInterval = 0;
+
+void ParseOption(int &argc, char **&argv)
 {
-	PAVISTREAM pStream;
-	union
-	{
-		BITMAPINFOHEADER *pbmihOrig;
-		void *pbmihOrigBuf;
-	};
-	union
-	{
-		BITMAPINFOHEADER *pbmihEncoded;
-		void *pbmihEncodedBuf;
-	};
-	union
-	{
-		BITMAPINFOHEADER *pbmihDecoded;
-		void *pbmihDecodedBuf;
-	};
-	LONG cbFormatOrig;
-	LONG cbFormatEncoded;
-	HIC hicCompress;
-	HIC hicDecompress;
-	DWORD dw;
-	__declspec(align(4096)) static char bufOrig[1024*1024*12];
-	__declspec(align(4096)) static char *bufEncoded = (char *)VirtualAlloc(NULL, 1024*1024*13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	VirtualProtect(bufEncoded + 1024*1024*12, 1024*1024, PAGE_NOACCESS, &dw);
-	fprintf(stderr, "bufEncoded = %p bufEncoded-last = %p\n", bufEncoded, bufEncoded+1024*1024*12);
-	__declspec(align(4096)) static char bufDecoded[1024*1024*12];
-	LONG cbOrig;
-	HRESULT hr;
-	LARGE_INTEGER liStartEncode, liEndEncode;
-	LARGE_INTEGER liStartDecode, liEndDecode;
-	LARGE_INTEGER liFreq;
-	DWORD dwAviIndexFlag;
-	char buf[256];
-	COMPVARS cv;
-	BOOL b;
-	DWORD dwHandler = -1;
-	AVISTREAMINFO asi;
-	DWORD cbRead;
-	DWORD cbState = 0;
-	void *pState;
-	BOOL bCheckLossless = FALSE;
 	int ch;
-	int qopt = 0;
-	int vopt = 0;
 
 	while ((ch = getopt(argc, argv, "a:cf:qv")) != -1)
 	{
@@ -244,58 +203,47 @@ int main(int argc, char **argv)
 	}
 	argc -= optind;
 	argv += optind;
+}
 
-	if (argc != 1)
-	{
-		usage();
-		/* NOTREACHED */
-	}
+void SelectCodec(const char *filename)
+{
+	PAVISTREAM pStream;
+	HRESULT hr;
+	BITMAPINFOHEADER *pbmihOrig;
+	LONG cbFormatOrig;
+	AVISTREAMINFO asi;
+	char buf[8];
 
-	printf("lossless checking = %s\n", bCheckLossless ? "enabled" : "disabled");
-
-	printf("\n");
-
-	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
-	liTotalOrigSize.QuadPart = 0;
-	liTotalEncSize.QuadPart = 0;
-
-	InitFlushCache();
-	GetProcessAffinityMask(GetCurrentProcess(), &dwpProcessAffinityMask, &dwpSystemAffinityMask);
-	QueryPerformanceFrequency(&liFreq);
-	AVIFileInit();
-
-	AVIStreamOpenFromFile(&pStream, argv[0], streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
 	hr = AVIStreamReadFormat(pStream, 0, NULL, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
-	pbmihOrigBuf = malloc(cbFormatOrig);
+	pbmihOrig = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 	hr = AVIStreamReadFormat(pStream, 0, pbmihOrig, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	AVIStreamInfo(pStream, &asi, sizeof(asi));
 	printf("frame count       = %d\n", asi.dwLength);
 	printf("frame rate        = %d/%d = %f fps\n", asi.dwRate, asi.dwScale, (double)asi.dwRate/(double)asi.dwScale);
 
-	hFile = CreateFile(argv[0], GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
-
 	FCC2String(buf, pbmihOrig->biCompression);
 	printf("source fcc        = %s (%08X)\n", buf, pbmihOrig->biCompression);
 	printf("source bitcount   = %d\n", pbmihOrig->biBitCount);
 
-	ScanChunk();
-
 	if (dwHandler == -1)
 	{
+		COMPVARS cv;
+
 		memset(&cv, 0, sizeof(cv));
 		cv.cbSize = sizeof(cv);
-		b = ICCompressorChoose(NULL, ICMF_CHOOSE_KEYFRAME, pbmihOrig, NULL, &cv, "vctest");
-		if (!b)
+		if (!ICCompressorChoose(NULL, ICMF_CHOOSE_KEYFRAME, pbmihOrig, NULL, &cv, "vctest"))
 		{
 			printf("ICCompressorChoose() returned FALSE\n");
-			return 0;
+			exit(1);
 		}
 		dwHandler = cv.fccHandler;
 		cbState = ICGetStateSize(cv.hic);
 		pState = malloc(cbState+1);
 		ICGetState(cv.hic, pState, cbState);
+		nKeyFrameInterval = cv.lKey;
 		ICCompressorFree(&cv);
 
 		FCC2String(buf, dwHandler);
@@ -309,6 +257,55 @@ int main(int argc, char **argv)
 		printf("codec fcc         = %s (%08X)\n", buf, dwHandler);
 	}
 
+	free(pbmihOrig);
+}
+
+void BenchmarkCodec(const char *filename)
+{
+	PAVISTREAM pStream;
+	HRESULT hr;
+	BITMAPINFOHEADER *pbmihOrig;
+	BITMAPINFOHEADER *pbmihEncoded;
+	BITMAPINFOHEADER *pbmihDecoded;
+	LONG cbFormatOrig;
+	LONG cbFormatEncoded;
+	AVISTREAMINFO asi;
+	HIC hicCompress;
+	HIC hicDecompress;
+	char buf[8];
+	LARGE_INTEGER liStartEncode, liEndEncode;
+	LARGE_INTEGER liStartDecode, liEndDecode;
+	DWORD dw;
+	__declspec(align(4096)) static char bufOrig[1024*1024*12];
+	__declspec(align(4096)) static char *bufEncoded = (char *)VirtualAlloc(NULL, 1024*1024*13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	VirtualProtect(bufEncoded + 1024*1024*12, 1024*1024, PAGE_NOACCESS, &dw);
+	fprintf(stderr, "bufEncoded = %p bufEncoded-last = %p\n", bufEncoded, bufEncoded+1024*1024*12);
+	__declspec(align(4096)) static char bufDecoded[1024*1024*12];
+	unsigned __int64 cbOrigTotal = 0;
+	unsigned __int64 cbEncodedTotal = 0;
+	vector<double> enctime;
+	vector<double> dectime;
+	vector<bool> iskey;
+	double totalenctime = 0;
+	double totaldectime = 0;
+
+	AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	hr = AVIStreamReadFormat(pStream, 0, NULL, &cbFormatOrig);
+	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
+	pbmihOrig = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
+	hr = AVIStreamReadFormat(pStream, 0, pbmihOrig, &cbFormatOrig);
+	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
+	AVIStreamInfo(pStream, &asi, sizeof(asi));
+	printf("frame count       = %d\n", asi.dwLength);
+	printf("frame rate        = %d/%d = %f fps\n", asi.dwRate, asi.dwScale, (double)asi.dwRate/(double)asi.dwScale);
+
+	FCC2String(buf, pbmihOrig->biCompression);
+	printf("source fcc        = %s (%08X)\n", buf, pbmihOrig->biCompression);
+	printf("source bitcount   = %d\n", pbmihOrig->biBitCount);
+
+	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	ScanChunk();
+
 	hicCompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_COMPRESS);
 	if (hicCompress == NULL) { printf("ICOpen() failed\n"); }
 	if (cbState > 0)
@@ -317,13 +314,13 @@ int main(int argc, char **argv)
 		if (dw == 0) { printf("ICSetState() failed\n"); }
 	}
 	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
-	pbmihEncodedBuf = malloc(cbFormatEncoded);
+	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	dw = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
 	if (dw != ICERR_OK) { printf("ICCompressGetFormat() failed  dw=%08x\n", dw); }
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
-	pbmihDecodedBuf = malloc(cbFormatOrig);
+	pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 	memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
 
 	dw = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
@@ -334,16 +331,17 @@ int main(int argc, char **argv)
 	for (int i = 0; i < asi.dwLength; i ++)
 	{
 		double etime, dtime;
+		DWORD cbRead;
+		DWORD dwAviIndexFlag;
+
 		//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
 		//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
 		pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
-		b = SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN);
-		if (!b) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
-		b = ReadFile(hFile, bufOrig, idx.second, &cbRead, NULL);
-		if (!b) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
+		if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
+		if (!ReadFile(hFile, bufOrig, idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
 		FlushCache();
 		QueryPerformanceCounter(&liStartEncode);
-		dw = ICCompress(hicCompress, (i == 0 || (cv.lKey != 0 && (i % cv.lKey) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded, pbmihOrig, bufOrig, NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
+		dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded, pbmihOrig, bufOrig, NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
 		QueryPerformanceCounter(&liEndEncode);
 		if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
 		char *pEncodedNew = bufEncoded;// + (1024*1024*12) - pbmihEncoded->biSizeImage;
@@ -367,8 +365,8 @@ int main(int argc, char **argv)
 			printf("frame #%d NOT LOSSLESS!!! - aborting\n", i);
 			break;
 		}
-		liTotalOrigSize.QuadPart += pbmihOrig->biSizeImage;
-		liTotalEncSize.QuadPart += pbmihEncoded->biSizeImage;
+		cbOrigTotal += pbmihOrig->biSizeImage;
+		cbEncodedTotal += pbmihEncoded->biSizeImage;
 		enctime.push_back(etime);
 		dectime.push_back(dtime);
 		iskey.push_back(dwAviIndexFlag&AVIIF_KEYFRAME);
@@ -387,9 +385,9 @@ int main(int argc, char **argv)
 	printf("\n");
 
 	printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
-		liTotalEncSize.QuadPart, liTotalOrigSize.QuadPart,
-		(double)liTotalEncSize.QuadPart/(double)liTotalOrigSize.QuadPart*100.0,
-		(double)liTotalOrigSize.QuadPart/(double)liTotalEncSize.QuadPart);
+		cbEncodedTotal, cbOrigTotal,
+		(double)cbEncodedTotal/(double)cbOrigTotal*100.0,
+		(double)cbOrigTotal/(double)cbEncodedTotal);
 
 	vector<double> ratime;
 	double totalratime = 0;
@@ -446,6 +444,32 @@ int main(int argc, char **argv)
 		printf("    90%%  %f\n", ratime[ratime.size()*0.90]);
 		printf("    max  %f\n", ratime[ratime.size()-1]);
 	}
+}
+
+int main(int argc, char **argv)
+{
+	ParseOption(argc, argv);
+
+	if (argc != 1)
+	{
+		usage();
+		/* NOTREACHED */
+	}
+
+	printf("lossless checking = %s\n", bCheckLossless ? "enabled" : "disabled");
+
+	printf("\n");
+
+	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+
+	InitFlushCache();
+	GetProcessAffinityMask(GetCurrentProcess(), &dwpProcessAffinityMask, &dwpSystemAffinityMask);
+	QueryPerformanceFrequency(&liFreq);
+	AVIFileInit();
+
+	SelectCodec(argv[0]);
+
+	BenchmarkCodec(argv[0]);
 
 	return 0;
 }
