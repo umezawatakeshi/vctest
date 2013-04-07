@@ -214,7 +214,8 @@ void SelectCodec(const char *filename)
 	AVISTREAMINFO asi;
 	char buf[8];
 
-	AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	hr = AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	if (FAILED(hr)) { printf("AVIStreamOpenFromFile() failed: %08X\n", hr); }
 	hr = AVIStreamReadFormat(pStream, 0, NULL, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	pbmihOrig = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
@@ -290,7 +291,8 @@ void BenchmarkCodec(const char *filename)
 	double totalenctime = 0;
 	double totaldectime = 0;
 
-	AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	hr = AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
+	if (FAILED(hr)) { printf("AVIStreamOpenFromFile() failed: %08X\n", hr); }
 	hr = AVIStreamReadFormat(pStream, 0, NULL, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	pbmihOrig = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
