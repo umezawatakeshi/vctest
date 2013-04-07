@@ -321,7 +321,7 @@ void BenchmarkCodec(const char *filename)
 	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
-	if (dw != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
+	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
