@@ -24,6 +24,8 @@
 #include <windows.h>
 #include <vfw.h>
 
+#define VERSION "2.0.0"
+
 #define ALLOCUNIT (64*1024)
 #define GUARDSIZE (1024*1024)
 
@@ -132,6 +134,9 @@ void FlushCache(void)
 void usage(void)
 {
 	fprintf(stderr,
+		"vctest " VERSION "\n"
+		"Copyright (C) 2008-2013 UMEZAWA Takeshi\n"
+		"Licensed under GNU General Public License version 2.\n\n"
 		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] <AVI file name>\n"
 		"  -a affinity_mask  Set process affinity mask\n"
 		"  -c                Enable lossless checking\n"
