@@ -5,7 +5,7 @@
  * vctest.cpp
  * Copyright (C) 2008-2013  梅澤 威志
  * 
- * このプログラムには GNU GPLv2 を適用します。
+ * このプログラムには GNU GPL バージョン2 またはそれ以降を適用します。
  */
 
 /*
@@ -136,7 +136,7 @@ void usage(void)
 	fprintf(stderr,
 		"vctest " VERSION "\n"
 		"Copyright (C) 2008-2013 UMEZAWA Takeshi\n"
-		"Licensed under GNU General Public License version 2.\n\n"
+		"Licensed under GNU General Public License version 2 or later.\n\n"
 		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] <AVI file name>\n"
 		"  -a affinity_mask  Set process affinity mask\n"
 		"  -c                Enable lossless checking\n"
