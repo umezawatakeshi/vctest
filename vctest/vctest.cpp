@@ -2,7 +2,7 @@
 /* $Id$ */
 
 /*
- * vctest.cpp
+ * Video Codec Test
  * Copyright (C) 2008-2013  梅澤 威志
  * 
  * このプログラムには GNU GPL バージョン2 またはそれ以降を適用します。
@@ -134,7 +134,7 @@ void FlushCache(void)
 void usage(void)
 {
 	fprintf(stderr,
-		"vctest " VERSION "\n"
+		"Video Codec Test, version " VERSION "\n"
 		"Copyright (C) 2008-2013 UMEZAWA Takeshi\n"
 		"Licensed under GNU General Public License version 2 or later.\n\n"
 		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] <AVI file name>\n"
