@@ -242,7 +242,7 @@ void ParseOption(int &argc, char **&argv)
 					buf[0] = optarg[i*2];
 					buf[1] = optarg[i*2+1];
 					buf[2] = '\0';
-					sscanf(buf, "%u", &val);
+					sscanf(buf, "%x", &val);
 					((char *)pState)[i] = val;
 				}
 			}
