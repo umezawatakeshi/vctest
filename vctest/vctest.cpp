@@ -343,6 +343,11 @@ void BenchmarkCodec(const char *filename)
 	double totalenctime = 0;
 	double totaldectime = 0;
 
+	printf("\n");
+
+	aviindex.clear();
+
+	printf("file name         = %s\n", filename);
 	hr = AVIStreamOpenFromFile(&pStream, filename, streamtypeVIDEO, 0, OF_SHARE_DENY_WRITE, NULL);
 	if (FAILED(hr)) { printf("AVIStreamOpenFromFile() failed: %08X\n", hr); }
 	hr = AVIStreamReadFormat(pStream, 0, NULL, &cbFormatOrig);
@@ -534,7 +539,7 @@ int main(int argc, char **argv)
 
 	ParseOption(argc, argv);
 
-	if (argc != 1)
+	if (argc < 1)
 	{
 		usage();
 		/* NOTREACHED */
@@ -549,9 +554,8 @@ int main(int argc, char **argv)
 
 	SelectCodec(argv[0]);
 
-	printf("\n");
-
-	BenchmarkCodec(argv[0]);
+	for (int i = 0; i < argc; i++)
+		BenchmarkCodec(argv[i]);
 
 	AVIFileExit();
 
