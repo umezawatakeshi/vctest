@@ -137,12 +137,14 @@ void usage(void)
 		"Video Codec Test, version " VERSION "\n"
 		"Copyright (C) 2008-2013 UMEZAWA Takeshi\n"
 		"Licensed under GNU General Public License version 2 or later.\n\n"
-		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] <AVI file name>\n"
-		"  -a affinity_mask  Set process affinity mask\n"
-		"  -c                Enable lossless checking\n"
-		"  -f codec_fourcc   Specify codec from command line\n"
-		"  -q                Quiet output\n"
-		"  -v                Verbose output\n"
+		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name>\n"
+		"  -a affinity_mask          Set process affinity mask\n"
+		"  -c                        Enable lossless checking\n"
+		"  -f codec_fourcc           Specify codec from command line\n"
+		"  -k key_frame_rate         Specify key frame rate from command line\n"
+		"  -s codec_state_hexstring  Specify codec state from command line\n"
+		"  -q                        Quiet output\n"
+		"  -v                        Verbose output\n"
 		, getprogname());
 	exit(1);
 }
@@ -161,7 +163,7 @@ void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cf:qv")) != -1)
+	while ((ch = getopt(argc, argv, "a:cf:qvs:k:")) != -1)
 	{
 		switch (ch)
 		{
@@ -211,6 +213,42 @@ void ParseOption(int &argc, char **&argv)
 				}
 				dwHandler = *(DWORD *)optarg;
 			}
+			break;
+		case 's':
+			{
+				if (strlen(optarg) % 2 != 0)
+				{
+					fprintf(stderr, "%s: bad hexstring -- %s\n", getprogname(), optarg);
+					usage();
+					/* NOTREACHED */
+				}
+				for (unsigned i = 0; i < strlen(optarg); i++)
+				{
+					if (!isxdigit((unsigned char)optarg[i]))
+					{
+						fprintf(stderr, "%s: bad hexstring -- %s\n", getprogname(), optarg);
+						usage();
+						/* NOTREACHED */
+					}
+				}
+				if (pState != NULL)
+					free(pState);
+				cbState = strlen(optarg) / 2;
+				pState = malloc(cbState + 1);
+				for (unsigned i = 0; i < cbState; i++)
+				{
+					char buf[3];
+					int val;
+					buf[0] = optarg[i*2];
+					buf[1] = optarg[i*2+1];
+					buf[2] = '\0';
+					sscanf(buf, "%u", &val);
+					((char *)pState)[i] = val;
+				}
+			}
+			break;
+		case 'k':
+			nKeyFrameInterval = atol(optarg);
 			break;
 		case 'q':
 			qopt++;
@@ -263,17 +301,16 @@ void SelectCodec(const char *filename)
 		ICGetState(cv.hic, pState, cbState);
 		nKeyFrameInterval = cv.lKey;
 		ICCompressorFree(&cv);
+	}
 
-		FCC2String(buf, dwHandler);
-		printf("codec fcc         = %s (%08X)\n", buf, dwHandler);
-		printf("key frame rate    = %d\n", cv.lKey);
-		printf("state size        = %d\n", cbState);
-	}
-	else
-	{
-		FCC2String(buf, dwHandler);
-		printf("codec fcc         = %s (%08X)\n", buf, dwHandler);
-	}
+	FCC2String(buf, dwHandler);
+	printf("codec fcc         = %s (%08X)\n", buf, dwHandler);
+	printf("key frame rate    = %ld\n", nKeyFrameInterval);
+	printf("state size        = %u\n", cbState);
+	printf("state data        =");
+	for (unsigned i = 0; i < cbState; i++)
+		printf(" %02X", ((char *)pState)[i]);
+	printf("\n");
 
 	free(pbmihOrig);
 }
