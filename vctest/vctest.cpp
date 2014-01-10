@@ -24,6 +24,8 @@
 #include <windows.h>
 #include <vfw.h>
 
+#include "GuardedBuffer.h"
+
 #define VERSION "2.0.0"
 
 #define ALLOCUNIT (64*1024)
@@ -332,9 +334,6 @@ void BenchmarkCodec(const char *filename)
 	LARGE_INTEGER liStartDecode, liEndDecode;
 	DWORD dw;
 	LRESULT lr;
-	__declspec(align(4096)) char *bufOrig;
-	__declspec(align(4096)) char *bufEncoded;
-	__declspec(align(4096)) char *bufDecoded;
 	unsigned __int64 cbOrigTotal = 0;
 	unsigned __int64 cbEncodedTotal = 0;
 	vector<double> enctime;
@@ -365,13 +364,8 @@ void BenchmarkCodec(const char *filename)
 
 	printf("\n");
 
-	size_t cbOrigBuf = ROUNDUP(pbmihOrig->biSizeImage, ALLOCUNIT);
-	bufOrig = (char *)VirtualAlloc(NULL, cbOrigBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
-	VirtualProtect(bufOrig - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
-	VirtualProtect(bufOrig + cbOrigBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
-	bufDecoded = (char *)VirtualAlloc(NULL, cbOrigBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
-	VirtualProtect(bufDecoded - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
-	VirtualProtect(bufDecoded + cbOrigBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
+	CGuardedBuffer bufOrig(pbmihOrig->biSizeImage);
+	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage);
 
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	ScanChunk();
@@ -387,10 +381,10 @@ void BenchmarkCodec(const char *filename)
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
 	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
+
 	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
-	bufEncoded = (char *)VirtualAlloc(NULL, cbEncodedBuf + GUARDSIZE * 2, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE) + GUARDSIZE;
-	VirtualProtect(bufEncoded - GUARDSIZE, GUARDSIZE, PAGE_NOACCESS, &dw);
-	VirtualProtect(bufEncoded + cbEncodedBuf, GUARDSIZE, PAGE_NOACCESS, &dw);
+
+	CGuardedBuffer bufEncoded(cbEncodedBuf);
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
@@ -418,17 +412,15 @@ void BenchmarkCodec(const char *filename)
 		//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
 		pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
 		if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
-		if (!ReadFile(hFile, bufOrig, idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
+		if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
 		FlushCache();
 		QueryPerformanceCounter(&liStartEncode);
-		dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded, pbmihOrig, bufOrig, NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
+		dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihOrig, bufOrig.GetHeadGuardedBuffer(), NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
 		QueryPerformanceCounter(&liEndEncode);
 		if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
-		char *pEncodedNew = bufEncoded;// + (1024*1024*12) - pbmihEncoded->biSizeImage;
-		//memmove(pEncodedNew, bufEncoded, pbmihEncoded->biSizeImage);
 		FlushCache();
 		QueryPerformanceCounter(&liStartDecode);
-		dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, pEncodedNew, pbmihDecoded, bufDecoded);
+		dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihDecoded, bufDecoded.GetHeadGuardedBuffer());
 		QueryPerformanceCounter(&liEndDecode);
 		if (dw != ICERR_OK) { printf("ICDecompress() failed  dw=%08x\n", dw); break; }
 		etime = (liEndEncode.QuadPart - liStartEncode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
@@ -440,7 +432,7 @@ void BenchmarkCodec(const char *filename)
 				pbmihEncoded->biSizeImage, (double)pbmihEncoded->biSizeImage / (double)pbmihOrig->biSizeImage * 100.0,
 				(pbmihEncoded->biSizeImage == 0) ? "NUL" : (dwAviIndexFlag&AVIIF_KEYFRAME) ? "KEY" : "");
 		}
-		if (bCheckLossless && memcmp(bufOrig, bufDecoded, pbmihOrig->biSizeImage) != 0)
+		if (bCheckLossless && memcmp(bufOrig.GetHeadGuardedBuffer(), bufDecoded.GetHeadGuardedBuffer(), pbmihOrig->biSizeImage) != 0)
 		{
 			printf("frame #%d NOT LOSSLESS!!! - aborting\n", i);
 			break;
@@ -525,10 +517,6 @@ void BenchmarkCodec(const char *filename)
 		printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
 		printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
 	}
-
-	VirtualFree(bufOrig - GUARDSIZE, 0, MEM_RELEASE);
-	VirtualFree(bufEncoded - GUARDSIZE, 0, MEM_RELEASE);
-	VirtualFree(bufDecoded - GUARDSIZE, 0, MEM_RELEASE);
 }
 
 int main(int argc, char **argv)

@@ -342,7 +342,21 @@
 				>
 			</File>
 			<File
+				RelativePath=".\GuardedBuffer.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\vctest.cpp"
+				>
+			</File>
+		</Filter>
+		<Filter
+			Name="ヘッダー ファイル"
+			Filter="h;hpp;hxx;hm;inl;inc;xsd"
+			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A300}"
+			>
+			<File
+				RelativePath=".\GuardedBuffer.h"
 				>
 			</File>
 		</Filter>
