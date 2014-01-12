@@ -1,8 +1,7 @@
 /* •¶šƒR[ƒh‚Í‚r‚i‚h‚r ‰üsƒR[ƒh‚Í‚b‚q‚k‚e */
 /* $Id$ */
 
-#include "windows.h"
-
+#include "stdafx.h"
 #include "GuardedBuffer.h"
 
 #define GUARDSIZE (1024*1024)

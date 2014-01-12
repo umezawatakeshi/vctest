@@ -14,29 +14,8 @@
  * getopt.c は BSD ライセンスが適用されます。
  */
 
-#define _CRT_SECURE_NO_WARNINGS
-
-#include <stdio.h>
-#include <errno.h>
-#include <vector>
-#include <algorithm>
-
-#include <windows.h>
-#include <vfw.h>
-
+#include "stdafx.h"
 #include "GuardedBuffer.h"
-
-#define VERSION "2.0.0"
-
-#define ALLOCUNIT (64*1024)
-#define GUARDSIZE (1024*1024)
-
-using namespace std;
-
-inline size_t ROUNDUP(size_t a, size_t b)
-{
-	return ((a + b - 1) / b) * b;
-}
 
 DWORD_PTR dwpProcessAffinityMask, dwpSystemAffinityMask;
 
