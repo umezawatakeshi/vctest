@@ -336,9 +336,6 @@ void BenchmarkCodec(const char *filename)
 	LRESULT lr;
 	unsigned __int64 cbOrigTotal = 0;
 	unsigned __int64 cbEncodedTotal = 0;
-	vector<double> enctime;
-	vector<double> dectime;
-	vector<bool> iskey;
 	double totalenctime = 0;
 	double totaldectime = 0;
 
@@ -357,6 +354,10 @@ void BenchmarkCodec(const char *filename)
 	AVIStreamInfo(pStream, &asi, sizeof(asi));
 	printf("frame count       = %d\n", asi.dwLength);
 	printf("frame rate        = %d/%d = %f fps\n", asi.dwRate, asi.dwScale, (double)asi.dwRate/(double)asi.dwScale);
+
+	vector<double> enctime(asi.dwLength);
+	vector<double> dectime(asi.dwLength);
+	vector<bool> iskey(asi.dwLength);
 
 	FCC2String(buf, pbmihOrig->biCompression);
 	printf("source fcc        = %s (%08X)\n", buf, pbmihOrig->biCompression);
@@ -413,16 +414,19 @@ void BenchmarkCodec(const char *filename)
 		pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
 		if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
 		if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
+
 		FlushCache();
 		QueryPerformanceCounter(&liStartEncode);
 		dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihOrig, bufOrig.GetHeadGuardedBuffer(), NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
 		QueryPerformanceCounter(&liEndEncode);
 		if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
+
 		FlushCache();
 		QueryPerformanceCounter(&liStartDecode);
 		dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihDecoded, bufDecoded.GetHeadGuardedBuffer());
 		QueryPerformanceCounter(&liEndDecode);
 		if (dw != ICERR_OK) { printf("ICDecompress() failed  dw=%08x\n", dw); break; }
+
 		etime = (liEndEncode.QuadPart - liStartEncode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
 		dtime = (liEndDecode.QuadPart - liStartDecode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
 		if (!qopt)
@@ -439,9 +443,9 @@ void BenchmarkCodec(const char *filename)
 		}
 		cbOrigTotal += pbmihOrig->biSizeImage;
 		cbEncodedTotal += pbmihEncoded->biSizeImage;
-		enctime.push_back(etime);
-		dectime.push_back(dtime);
-		iskey.push_back((dwAviIndexFlag&AVIIF_KEYFRAME) != 0);
+		enctime[i] = etime;
+		dectime[i] = dtime;
+		iskey[i] = ((dwAviIndexFlag&AVIIF_KEYFRAME) != 0);
 		totalenctime += etime;
 		totaldectime += dtime;
 	}
@@ -462,7 +466,7 @@ void BenchmarkCodec(const char *filename)
 		(double)cbEncodedTotal/(double)cbOrigTotal*100.0,
 		(double)cbOrigTotal/(double)cbEncodedTotal);
 
-	vector<double> ratime;
+	vector<double> ratime(asi.dwLength);
 	double totalratime = 0;
 
 	for (unsigned int i = 0; i < asi.dwLength; i ++)
@@ -474,7 +478,7 @@ void BenchmarkCodec(const char *filename)
 			if (iskey[j])
 				break;
 		}
-		ratime.push_back(t);
+		ratime[i] = t;
 		totalratime += t;
 	}
 
