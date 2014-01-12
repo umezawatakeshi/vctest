@@ -16,6 +16,7 @@
 
 #include "stdafx.h"
 #include "GuardedBuffer.h"
+#include "FlushCache.h"
 
 DWORD_PTR dwpProcessAffinityMask, dwpSystemAffinityMask;
 
@@ -87,31 +88,6 @@ void ScanChunk(void)
 		/* NOTHING */;
 }
 
-char *pRandomBuf;
-#define RANDOMBUFSIZE (16*1024*1024)
-
-void InitFlushCache(void)
-{
-	pRandomBuf = (char *)VirtualAlloc(NULL, RANDOMBUFSIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-	for (int i = 0; i < RANDOMBUFSIZE; i++)
-		pRandomBuf[i] = rand();
-}
-
-void FlushCache(void)
-{
-	static volatile char ch;
-
-	for (DWORD_PTR mask = 1; mask != 0; mask <<= 1)
-	{
-		if (SetThreadAffinityMask(GetCurrentThread(), mask) != 0)
-		{
-			for (int i = 0; i < RANDOMBUFSIZE; i+=32)
-				ch = pRandomBuf[i];
-		}
-	}
-	SetThreadAffinityMask(GetCurrentThread(), dwpProcessAffinityMask);
-}
-
 void usage(void)
 {
 	fprintf(stderr,
@@ -152,6 +128,8 @@ void ParseOption(int &argc, char **&argv)
 			{
 				DWORD_PTR a;
 				char *endptr;
+
+				DWORD_PTR dwpProcessAffinityMask, dwpSystemAffinityMask;
 
 				errno = 0;
 #ifdef _WIN64

@@ -338,6 +338,10 @@
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A2FF}"
 			>
 			<File
+				RelativePath=".\FlushCache.cpp"
+				>
+			</File>
+			<File
 				RelativePath=".\getopt.c"
 				>
 				<FileConfiguration
@@ -423,6 +427,10 @@
 			Filter="h;hpp;hxx;hm;inl;inc;xsd"
 			UniqueIdentifier="{4FC737F1-C7A5-4376-A066-2A32D752A300}"
 			>
+			<File
+				RelativePath=".\FlushCache.h"
+				>
+			</File>
 			<File
 				RelativePath=".\GuardedBuffer.h"
 				>
