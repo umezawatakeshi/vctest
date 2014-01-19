@@ -13,4 +13,4 @@
 
 using namespace std;
 
-#define VERSION "2.0.0"
+#define VERSION "2.1.0"
