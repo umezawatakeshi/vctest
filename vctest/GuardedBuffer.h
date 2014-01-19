@@ -12,7 +12,7 @@ private:
 	char *m_pGuarded;
 
 public:
-	CGuardedBuffer(size_t cb);
+	CGuardedBuffer(size_t cb, bool bHighAddress);
 	~CGuardedBuffer(void);
 
 public:

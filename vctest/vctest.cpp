@@ -94,12 +94,13 @@ void usage(void)
 		"Video Codec Test, version " VERSION "\n"
 		"Copyright (C) 2008-2013 UMEZAWA Takeshi\n"
 		"Licensed under GNU General Public License version 2 or later.\n\n"
-		"usage: %s [-cqv] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name>\n"
+		"usage: %s [-cqvH] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name>\n"
 		"  -a affinity_mask          Set process affinity mask\n"
 		"  -c                        Enable lossless checking\n"
 		"  -f codec_fourcc           Specify codec from command line\n"
 		"  -k key_frame_rate         Specify key frame rate from command line\n"
 		"  -s codec_state_hexstring  Specify codec state from command line\n"
+		"  -H                        Allocate buffers at high address\n"
 		"  -q                        Quiet output\n"
 		"  -v                        Verbose output\n"
 		, getprogname());
@@ -108,6 +109,7 @@ void usage(void)
 
 DWORD dwHandler = -1;
 BOOL bCheckLossless = FALSE;
+bool Hopt = 0;
 int qopt = 0;
 int vopt = 0;
 DWORD cbState = 0;
@@ -120,7 +122,7 @@ void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cf:qvs:k:")) != -1)
+	while ((ch = getopt(argc, argv, "a:cf:qvs:k:H")) != -1)
 	{
 		switch (ch)
 		{
@@ -208,6 +210,9 @@ void ParseOption(int &argc, char **&argv)
 			break;
 		case 'k':
 			nKeyFrameInterval = atol(optarg);
+			break;
+		case 'H':
+			Hopt = true;
 			break;
 		case 'q':
 			qopt++;
@@ -322,8 +327,8 @@ void BenchmarkCodec(const char *filename)
 
 	printf("\n");
 
-	CGuardedBuffer bufOrig(pbmihOrig->biSizeImage);
-	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage);
+	CGuardedBuffer bufOrig(pbmihOrig->biSizeImage, Hopt);
+	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage, Hopt);
 
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	ScanChunk();
@@ -342,7 +347,7 @@ void BenchmarkCodec(const char *filename)
 
 	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
 
-	CGuardedBuffer bufEncoded(cbEncodedBuf);
+	CGuardedBuffer bufEncoded(cbEncodedBuf, Hopt);
 
 	hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
 	if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
