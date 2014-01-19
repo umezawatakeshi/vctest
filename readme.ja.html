@@ -2,10 +2,10 @@
 <!-- $Id$ -->
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=shift_jis">
-<title>Video Codec Test 2.0.0 readme （日本語）</title>
+<title>Video Codec Test 2.1.0 readme （日本語）</title>
 </head>
 <body>
-<h1>Video Codec Test 2.0.0 readme （日本語）</h1>
+<h1>Video Codec Test 2.1.0 readme （日本語）</h1>
 <hr>
 <h2 id="copyright_notice">著作権表示</h2>
 <h3>英語</h3>
@@ -54,9 +54,19 @@ Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA)。</p>
 <dt>開発ツール</dt>
 <dd>Visual Studio 2005 SP1</dd>
 <dd>Windows SDK for Windows Server 2008 and .NET Framework 3.5 (Windows SDK 6.1)</dd>
-<dd>AMD CodeAnalyst for Windows v3.1</dd>
+<dd>AMD CodeAnalyst for Windows v3.2</dd>
 </dl>
 <h2 id="history">改版履歴</h2>
+<h3>バージョン 2.1.0</h3>
+<dl>
+<dt>機能追加</dt><dd><ul>
+<li>キーフレーム間隔を指定するオプションを追加した。(-k)</li>
+<li>コーデックステートを指定するオプションを追加した。(-s)</li>
+<li>エンコードのテストのみを行うオプションを追加した。(-e)</li>
+<li>バッファを高いアドレス（x86では0x10000以上、x64では0x100000000以上）に確保するオプションを追加した。(-H)</li>
+<li>複数ファイルに対してバッチでテストできるようにした。</li>
+</ul></dd>
+</dl>
 <h3>バージョン 2.0.0</h3>
 <p>これより前の変更点については不明確である。</p>
 <hr>
