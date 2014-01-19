@@ -81,7 +81,7 @@ void usage(void)
 		"Video Codec Test, version " VERSION "\n"
 		"Copyright (C) 2008-2014 UMEZAWA Takeshi\n"
 		"Licensed under GNU General Public License version 2 or later.\n\n"
-		"usage: %s {-c|-e} [-qvH] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name>\n"
+		"usage: %s {-c|-e} [-qvH] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name> ...\n"
 		"  -a affinity_mask          Set process affinity mask\n"
 		"  -c                        Enable lossless checking\n"
 		"  -e                        Encode only\n"
