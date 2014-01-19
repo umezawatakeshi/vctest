@@ -20,7 +20,6 @@ CGuardedBuffer::CGuardedBuffer(size_t cb, bool bHighAddress)
 	m_cbAllocated = m_cbGuarded + GUARDSIZE * 2;
 
 	m_pAllocated = (char *)VirtualAlloc(NULL, m_cbAllocated, MEM_COMMIT | MEM_RESERVE | (bHighAddress ? MEM_TOP_DOWN : 0), PAGE_READWRITE);
-	fprintf(stderr, "allocate %p\n", m_pAllocated);
 	if (bHighAddress)
 	{
 #ifdef _WIN64
