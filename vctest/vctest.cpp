@@ -89,6 +89,7 @@ void usage(void)
 		"  -k key_frame_rate         Specify key frame rate from command line\n"
 		"  -s codec_state_hexstring  Specify codec state from command line\n"
 		"  -H                        Allocate buffers at high address\n"
+		"  -W                        Wait for 5 seconds before benchmark\n"
 		"  -q                        Quiet output\n"
 		"  -v                        Verbose output\n"
 		, getprogname());
@@ -101,6 +102,7 @@ bool bEncodeOnly = false;
 bool Hopt = 0;
 int qopt = 0;
 int vopt = 0;
+bool Wopt = false;
 DWORD cbState = 0;
 void *pState = NULL;
 LARGE_INTEGER liFreq;
@@ -111,7 +113,7 @@ void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cef:qvs:k:H")) != -1)
+	while ((ch = getopt(argc, argv, "a:cef:qvs:k:HW")) != -1)
 	{
 		switch (ch)
 		{
@@ -205,6 +207,9 @@ void ParseOption(int &argc, char **&argv)
 			break;
 		case 'H':
 			Hopt = true;
+			break;
+		case 'W':
+			Wopt = true;
 			break;
 		case 'q':
 			qopt++;
@@ -520,6 +525,9 @@ int main(int argc, char **argv)
 	AVIFileInit();
 
 	SelectCodec(argv[0]);
+
+	if (Wopt)
+		Sleep(5000);
 
 	for (int i = 0; i < argc; i++)
 		BenchmarkCodec(argv[i]);
