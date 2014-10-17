@@ -276,7 +276,11 @@ void SelectCodec(const char *filename)
 	printf("state size        = %u\n", cbState);
 	printf("state data        =");
 	for (unsigned i = 0; i < cbState; i++)
+	{
+		if (i != 0 && (i % 16) == 0)
+			printf("\n                   ");
 		printf(" %02X", ((unsigned char *)pState)[i]);
+	}
 	printf("\n");
 
 	free(pbmihOrig);
