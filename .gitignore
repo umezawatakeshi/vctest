@@ -1,0 +1,14 @@
+[Dd]ebug
+[Rr]elease
+x64
+ipch
+/*.opensdf
+/*.sdf
+/*.suo
+/CodeAnalyst
+/vctest-*-src.zip
+*.aps
+/*.opendb
+/*.db
+/.vs
+*.vcxproj.user
