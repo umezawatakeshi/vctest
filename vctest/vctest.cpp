@@ -90,8 +90,8 @@ void usage(void)
 		"  -s codec_state_hexstring  Specify codec state from command line\n"
 		"  -H                        Allocate buffers at high address\n"
 		"  -W                        Wait for 5 seconds before benchmark\n"
-		"  -q                        Quiet output\n"
-		"  -v                        Verbose output\n"
+		"  -q                        Quiet output   (Decrease verbosity)\n"
+		"  -v                        Verbose output (Increase verbosity)\n"
 		, getprogname());
 	exit(1);
 }
@@ -100,8 +100,7 @@ DWORD dwHandler = -1;
 BOOL bCheckLossless = FALSE;
 bool bEncodeOnly = false;
 bool Hopt = 0;
-int qopt = 0;
-int vopt = 0;
+int verbosity = 0;
 bool Wopt = false;
 DWORD cbState = 0;
 void *pState = NULL;
@@ -212,10 +211,10 @@ void ParseOption(int &argc, char **&argv)
 			Wopt = true;
 			break;
 		case 'q':
-			qopt++;
+			verbosity--;
 			break;
 		case 'v':
-			vopt++;
+			verbosity++;
 			break;
 		case '?':
 		default:
@@ -376,7 +375,7 @@ void BenchmarkCodec(const char *filename)
 
 		if (bStdOutConsole)
 			printf("\r");
-		if (!qopt || bStdOutConsole)
+		if (verbosity > 0 || (verbosity >= -1 && bStdOutConsole))
 			printf("%5d/%5d", i, asi.dwLength);
 		fflush(stdout);
 
@@ -407,7 +406,7 @@ void BenchmarkCodec(const char *filename)
 			totaldectime += dtime;
 		}
 
-		if (!qopt)
+		if (verbosity >= 0)
 		{
 			printf(" %10.6fms", etime);
 			if (!bEncodeOnly)
@@ -437,7 +436,7 @@ void BenchmarkCodec(const char *filename)
 
 	AVIStreamRelease(pStream);
 
-	if (!qopt)
+	if (verbosity >= 0)
 		printf("\n");
 	else if (bStdOutConsole)
 		printf("\r");
@@ -450,7 +449,7 @@ void BenchmarkCodec(const char *filename)
 
 	sort(enctime.begin(), enctime.end());
 	printf("Encode time: %fms/%df = %fms/f = %f fps\n", totalenctime, asi.dwLength, totalenctime/asi.dwLength, 1000.0*asi.dwLength/totalenctime);
-	if (vopt)
+	if (verbosity > 0)
 	{
 		printf("    min  %f\n",  enctime[0]);
 		printf("    10%%  %f\n", enctime[(size_t)(enctime.size()*0.10)]);
@@ -465,7 +464,7 @@ void BenchmarkCodec(const char *filename)
 	{
 		sort(dectime.begin(), dectime.end());
 		printf("Decode time: %fms/%df = %fms/f = %f fps\n", totaldectime, asi.dwLength, totaldectime/asi.dwLength, 1000.0*asi.dwLength/totaldectime);
-		if (vopt)
+		if (verbosity > 0)
 		{
 			printf("    min  %f\n",  dectime[0]);
 			printf("    10%%  %f\n", dectime[(size_t)(dectime.size()*0.10)]);
@@ -494,7 +493,7 @@ void BenchmarkCodec(const char *filename)
 
 		sort(ratime.begin(), ratime.end());
 		printf("Random access time: %fms/f\n", totalratime/asi.dwLength);
-		if (vopt)
+		if (verbosity > 0)
 		{
 			printf("    min  %f\n",  ratime[0]);
 			printf("    10%%  %f\n", ratime[(size_t)(ratime.size()*0.10)]);
