@@ -11,6 +11,8 @@
 #include <windows.h>
 #include <vfw.h>
 
+#include "myinttypes.h"
+
 using namespace std;
 
 #define VERSION "2.1.0"

@@ -143,7 +143,7 @@ void ParseOption(int &argc, char **&argv)
 					usage();
 					/* NOTREACHED */
 				}
-				fprintf(stderr, "changing process affinity mask from 0x%X to 0x%X\n", dwpProcessAffinityMask, dwpProcessAffinityMask & a);
+				fprintf(stderr, "changing process affinity mask from 0x%" PRIXSZT " to 0x%" PRIXSZT "\n", dwpProcessAffinityMask, dwpProcessAffinityMask & a);
 				if (!SetProcessAffinityMask(GetCurrentProcess(), dwpProcessAffinityMask & a))
 				{
 					fprintf(stderr, "%s: failed to set affinity mask -- %s\n", getprogname(), optarg);
@@ -350,9 +350,9 @@ void BenchmarkCodec(const char *filename)
 	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%p\n", lr); }
+	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%" PRIdSZT "\n", lr); }
 	lr = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%p\n", lr); }
+	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%" PRIdSZT "\n", lr); }
 
 	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
 
@@ -365,7 +365,7 @@ void BenchmarkCodec(const char *filename)
 		pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 		memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
 		lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
-		if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%p\n", lr); }
+		if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); }
 	}
 
 	for (unsigned int i = 0; i < asi.dwLength; i ++)
