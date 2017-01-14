@@ -292,12 +292,12 @@ void BenchmarkCodec(const char *filename)
 	HRESULT hr;
 	BITMAPINFOHEADER *pbmihOrig;
 	BITMAPINFOHEADER *pbmihEncoded;
-	BITMAPINFOHEADER *pbmihDecoded;
+	BITMAPINFOHEADER *pbmihDecoded = NULL;
 	LONG cbFormatOrig;
 	LONG cbFormatEncoded;
 	AVISTREAMINFO asi;
 	HIC hicCompress;
-	HIC hicDecompress;
+	HIC hicDecompress = NULL;
 	char buf[8];
 	LARGE_INTEGER liStartEncode, liEndEncode;
 	LARGE_INTEGER liStartDecode, liEndDecode;
