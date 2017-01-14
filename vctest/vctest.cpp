@@ -188,7 +188,7 @@ void ParseOption(int &argc, char **&argv)
 				}
 				if (pState != NULL)
 					free(pState);
-				cbState = strlen(optarg) / 2;
+				cbState = (DWORD) strlen(optarg) / 2;
 				pState = malloc(cbState + 1);
 				for (unsigned i = 0; i < cbState; i++)
 				{
