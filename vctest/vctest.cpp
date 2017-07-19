@@ -310,6 +310,7 @@ void BenchmarkCodec(const char *filename)
 	unsigned __int64 cbEncodedTotal = 0;
 	double totalenctime = 0;
 	double totaldectime = 0;
+	bool bCannotDecode = false;
 
 	if (verbosity >= -1)
 		printf("\n");
@@ -376,7 +377,7 @@ void BenchmarkCodec(const char *filename)
 		pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 		memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
 		lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
-		if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); bEncodeOnly = TRUE; }
+		if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); bCannotDecode = true; }
 	}
 
 	for (unsigned int i = 0; i < asi.dwLength; i ++)
@@ -406,7 +407,7 @@ void BenchmarkCodec(const char *filename)
 		enctime[i] = etime;
 		totalenctime += etime;
 
-		if (!bEncodeOnly)
+		if (!bEncodeOnly && !bCannotDecode)
 		{
 			FlushCache();
 			QueryPerformanceCounter(&liStartDecode);
@@ -421,7 +422,7 @@ void BenchmarkCodec(const char *filename)
 		if (verbosity >= 0)
 		{
 			printf(" %10.6fms", etime);
-			if (!bEncodeOnly)
+			if (!bEncodeOnly && !bCannotDecode)
 				printf(" %10.6fms", dtime);
 			printf(" %7dbytes (%4.1f%%) %s\n",
 				pbmihEncoded->biSizeImage, (double)pbmihEncoded->biSizeImage / (double)pbmihOrig->biSizeImage * 100.0,
@@ -440,7 +441,7 @@ void BenchmarkCodec(const char *filename)
 	ICCompressEnd(hicCompress);
 	ICClose(hicCompress);
 
-	if (!bEncodeOnly)
+	if (!bEncodeOnly && !bCannotDecode)
 	{
 		ICDecompressEnd(hicDecompress);
 		ICClose(hicDecompress);
@@ -482,7 +483,7 @@ void BenchmarkCodec(const char *filename)
 		printf("    max  %f\n",  enctime[(size_t)(enctime.size()-1)]);
 	}
 
-	if (!bEncodeOnly)
+	if (!bEncodeOnly && !bCannotDecode)
 	{
 		sort(dectime.begin(), dectime.end());
 		if (verbosity >= -1)
