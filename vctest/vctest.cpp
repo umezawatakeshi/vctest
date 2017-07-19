@@ -377,7 +377,7 @@ void BenchmarkCodec(const char *filename)
 		pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
 		memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
 		lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
-		if (lr != ICERR_OK) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); bCannotDecode = true; }
+		if (lr != ICERR_OK) { if (verbosity >= -1) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); } bCannotDecode = true; }
 	}
 
 	for (unsigned int i = 0; i < asi.dwLength; i ++)
@@ -532,6 +532,11 @@ void BenchmarkCodec(const char *filename)
 			printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
 			printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
 		}
+	}
+	else if (bCannotDecode)
+	{
+		if (verbosity < -1)
+			printf(",-,-");
 	}
 	if (verbosity < -1)
 		printf("\n");
