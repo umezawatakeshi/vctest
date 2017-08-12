@@ -2,10 +2,10 @@
 <!-- $Id$ -->
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
-<title>Video Codec Test 2.2.1 readme (English)</title>
+<title>Video Codec Test 2.2.2 readme (English)</title>
 </head>
 <body>
-<h1>Video Codec Test 2.2.1 readme (English)</h1>
+<h1>Video Codec Test 2.2.2 readme (English)</h1>
 <hr>
 <h2 id="copyright_notice">Copyright Notice</h2>
 <p>Video Codec Test<br>Copyright &copy; 2008-2017  UMEZAWA Takeshi</p>
@@ -25,7 +25,7 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA</p>
 <h2 id="environment">Environment</h2>
 <h3>Minimum requirement</h3>
 <dl>
-<dt>OS</dt><dd>Windows Vista or later</dd>
+<dt>OS</dt><dd>Windows 7 or later</dd>
 </dl>
 <h2 id="installation">Installation</h2>
 <p>Expand all files to suitable folder. This application doesn't write to filesystem nor registry, so you can uninstall it just by deleting expanded files.</p>
@@ -40,7 +40,16 @@ Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA</p>
 <dd>Visual Studio 2015</dd>
 </dl>
 <h2 id="history">Version history</h2>
-<h3>Version&#12531; 2.2.1</h3>
+<h3>Version 2.2.2</h3>
+<dl>
+<dt>Bug fixes</dt><dd><ul>
+<li>Once ICDecompressBegin failed, don't decode following files.</li>
+</ul></dd>
+<dt>Others</dt><dd><ul>
+<li>When Enough -q option is specified and ICDecompressBegin failed, show hyphen at decoding speed instead of error report.</li>
+</ul></dd>
+</dl>
+<h3>Version 2.2.1</h3>
 <dl>
 <dt>Others</dt><dd><ul>
 <li>Statically linked to runtime library.</li>

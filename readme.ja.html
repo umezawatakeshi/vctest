@@ -2,10 +2,10 @@
 <!-- $Id$ -->
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=shift_jis">
-<title>Video Codec Test 2.2.1 readme （日本語）</title>
+<title>Video Codec Test 2.2.2 readme （日本語）</title>
 </head>
 <body>
-<h1>Video Codec Test 2.2.1 readme （日本語）</h1>
+<h1>Video Codec Test 2.2.2 readme （日本語）</h1>
 <hr>
 <h2 id="copyright_notice">著作権表示</h2>
 <h3>英語</h3>
@@ -40,7 +40,7 @@ Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA)。</p>
 <h2 id="environment">動作環境</h2>
 <h3>必須環境</h3>
 <dl>
-<dt>OS</dt><dd>Windows Vista 以降</dd>
+<dt>OS</dt><dd>Windows 7 以降</dd>
 </dl>
 <h2 id="installation">インストール等</h2>
 <p>適当なフォルダに全てのファイルを展開してください。アプリケーション自体はファイルシステムやレジストリに書き込まないので、展開したファイルを削除すればアンインストール完了です。</p>
@@ -55,6 +55,15 @@ Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA)。</p>
 <dd>Visual Studio 2015</dd>
 </dl>
 <h2 id="history">改版履歴</h2>
+<h3>バージョン 2.2.2</h3>
+<dl>
+<dt>バグ修正</dt><dd><ul>
+<li>一度 ICDecompressBegin に失敗すると、それ以降のファイルでデコードしようとしなくなっていた。</li>
+</ul></dd>
+<dt>その他</dt><dd><ul>
+<li>十分に -q オプションが指定されている時に ICDecompressBegin が失敗した場合、エラー表示するのではなく結果のデコード速度でハイフンを表示するようにした。</li>
+</ul></dd>
+</dl>
 <h3>バージョン 2.2.1</h3>
 <dl>
 <dt>その他</dt><dd><ul>
