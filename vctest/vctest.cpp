@@ -362,9 +362,9 @@ void BenchmarkCodec(const char *filename)
 	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
 	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
 	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%" PRIdSZT "\n", lr); return; }
+	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
 	lr = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%" PRIdSZT "\n", lr); return; }
+	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
 
 	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
 
