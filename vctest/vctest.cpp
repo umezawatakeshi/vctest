@@ -250,6 +250,7 @@ void SelectCodec(const char *filename)
 	hr = AVIStreamReadFormat(pStream, 0, pbmihOrig, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	AVIStreamInfo(pStream, &asi, sizeof(asi));
+	AVIStreamRelease(pStream);
 
 	if (dwHandler == -1)
 	{
