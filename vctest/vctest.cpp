@@ -574,5 +574,7 @@ int main(int argc, char **argv)
 
 	AVIFileExit();
 
+	Sleep(50); // MagicYUV の場合、 ICClose してすぐプロセスが終了すると通知領域のアイコンが残ってしまうことがある（※たぶん MagicYUV のせいではない）ので、少し待つ。
+
 	return 0;
 }
