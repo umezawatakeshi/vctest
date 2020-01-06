@@ -89,7 +89,7 @@ void usage(void)
 		"  -k key_frame_rate         Specify key frame rate from command line\n"
 		"  -s codec_state_hexstring  Specify codec state from command line\n"
 		"  -H                        Allocate buffers at high address\n"
-		"  -W                        Wait for 5 seconds before benchmark\n"
+		"  -W                        Wait for enter key before benchmark\n"
 		"  -q                        Quiet output   (Decrease verbosity)\n"
 		"  -v                        Verbose output (Increase verbosity)\n"
 		, getprogname());
@@ -567,7 +567,11 @@ int main(int argc, char **argv)
 	SelectCodec(argv[0]);
 
 	if (Wopt)
-		Sleep(5000);
+	{
+		char buf[16];
+		printf("Press enter key to continue...\n");
+		fgets(buf, 16, stdin);
+	}
 
 	for (int i = 0; i < argc; i++)
 		BenchmarkCodec(argv[i]);
