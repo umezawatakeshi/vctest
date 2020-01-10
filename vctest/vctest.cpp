@@ -88,6 +88,7 @@ void usage(void)
 		"  -f codec_fourcc           Specify codec from command line\n"
 		"  -k key_frame_rate         Specify key frame rate from command line\n"
 		"  -s codec_state_hexstring  Specify codec state from command line\n"
+		"  -m N,M                    run N measures and show average of median M measures"
 		"  -H                        Allocate buffers at high address\n"
 		"  -W                        Wait for enter key before benchmark\n"
 		"  -q                        Quiet output   (Decrease verbosity)\n"
@@ -107,12 +108,14 @@ void *pState = NULL;
 LARGE_INTEGER liFreq;
 LONG nKeyFrameInterval = 0;
 BOOL bStdOutConsole;
+int nMeasures = 1;
+int nMedians = 1;
 
 void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cef:qvs:k:HW")) != -1)
+	while ((ch = getopt(argc, argv, "a:cef:qvs:k:m:HW")) != -1)
 	{
 		switch (ch)
 		{
@@ -205,6 +208,30 @@ void ParseOption(int &argc, char **&argv)
 		case 'k':
 			nKeyFrameInterval = atol(optarg);
 			break;
+		case 'm':
+			{
+				int n, m;
+				char* p;
+				if ((p = strchr(optarg, ',')) == NULL)
+				{
+					fprintf(stderr, "%s: bad N,M -- %s\n", getprogname(), optarg);
+					usage();
+					/* NOTREACHED */
+				}
+				*p = NULL;
+				n = atoi(optarg);
+				m = atoi(p + 1);
+				if (n < 1 || m < 1 || n < m || (n - m) % 2 != 0)
+				{
+					*p = ',';
+					fprintf(stderr, "%s: bad N,M -- %s\n", getprogname(), optarg);
+					usage();
+					/* NOTREACHED */
+				}
+				nMeasures = n;
+				nMedians = m;
+			}
+			break;
 		case 'H':
 			Hopt = true;
 			break;
@@ -230,6 +257,12 @@ void ParseOption(int &argc, char **&argv)
 	{
 		fprintf(stderr, "%s: -c and -e are exclusive\n", getprogname());
 		usage();
+	}
+
+	if (nMeasures > 1 && verbosity > -2)
+	{
+		fprintf(stderr, "%s: -m implies -qq. automatically decrease verbosity.\n", getprogname());
+		verbosity = -2;
 	}
 }
 
@@ -309,8 +342,6 @@ void BenchmarkCodec(const char *filename)
 	LRESULT lr;
 	unsigned __int64 cbOrigTotal = 0;
 	unsigned __int64 cbEncodedTotal = 0;
-	double totalenctime = 0;
-	double totaldectime = 0;
 	bool bCannotDecode = false;
 
 	if (verbosity >= -1)
@@ -333,6 +364,7 @@ void BenchmarkCodec(const char *filename)
 	hr = AVIStreamReadFormat(pStream, 0, pbmihOrig, &cbFormatOrig);
 	if (FAILED(hr)) { printf("AVIStreamReadFormat() failed: %08X\n", hr); }
 	AVIStreamInfo(pStream, &asi, sizeof(asi));
+	AVIStreamRelease(pStream);
 	if (verbosity >= -1)
 	{
 		printf("frame count       = %d\n", asi.dwLength);
@@ -347,200 +379,229 @@ void BenchmarkCodec(const char *filename)
 	vector<double> dectime(asi.dwLength);
 	vector<bool> iskey(asi.dwLength);
 
+	vector<double> encmeasure(nMeasures);
+	vector<double> decmeasure(nMeasures);
+	vector<double> rameasure(nMeasures);
+
 	CGuardedBuffer bufOrig(pbmihOrig->biSizeImage, Hopt);
 	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage, Hopt);
 
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
 	ScanChunk();
 
-	hicCompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_COMPRESS);
-	if (hicCompress == NULL) { printf("ICOpen() failed\n"); }
-	if (cbState > 0)
+	for (int iMeasure = 0; iMeasure < nMeasures; ++iMeasure)
 	{
-		lr = ICSetState(hicCompress, pState, cbState);
-		if (lr == 0) { printf("ICSetState() failed\n"); }
-	}
-	cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
-	pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
-	lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
-	lr = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
-	if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
+		double totalenctime = 0;
+		double totaldectime = 0;
 
-	size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
+		hicCompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_COMPRESS);
+		if (hicCompress == NULL) { printf("ICOpen() failed\n"); }
+		if (cbState > 0)
+		{
+			lr = ICSetState(hicCompress, pState, cbState);
+			if (lr == 0) { printf("ICSetState() failed\n"); }
+		}
+		cbFormatEncoded = ICCompressGetFormatSize(hicCompress, pbmihOrig);
+		pbmihEncoded = (BITMAPINFOHEADER *)malloc(cbFormatEncoded);
+		lr = ICCompressGetFormat(hicCompress, pbmihOrig, pbmihEncoded);
+		if (lr != ICERR_OK) { printf("ICCompressGetFormat() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
+		lr = ICCompressBegin(hicCompress, pbmihOrig, pbmihEncoded);
+		if (lr != ICERR_OK) { printf("ICCompressBegin() failed  lr=%" PRIdSZT "\n", lr); ICClose(hicCompress); return; }
 
-	CGuardedBuffer bufEncoded(cbEncodedBuf, Hopt);
+		size_t cbEncodedBuf = ICCompressGetSize(hicCompress, pbmihOrig, pbmihEncoded);
 
-	if (!bEncodeOnly)
-	{
-		hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
-		if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
-		pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
-		memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
-		lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
-		if (lr != ICERR_OK) { if (verbosity >= -1) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); } bCannotDecode = true; }
-	}
+		CGuardedBuffer bufEncoded(cbEncodedBuf, Hopt);
 
-	for (unsigned int i = 0; i < asi.dwLength; i ++)
-	{
-		double etime, dtime;
-		DWORD cbRead;
-		DWORD dwAviIndexFlag;
+		if (!bEncodeOnly)
+		{
+			hicDecompress = ICOpen(ICTYPE_VIDEO, dwHandler, ICMODE_DECOMPRESS);
+			if (hicDecompress == NULL) { printf("ICOpen() failed\n"); }
+			pbmihDecoded = (BITMAPINFOHEADER *)malloc(cbFormatOrig);
+			memcpy(pbmihDecoded, pbmihOrig, cbFormatOrig);
+			lr = ICDecompressBegin(hicDecompress, pbmihEncoded, pbmihDecoded);
+			if (lr != ICERR_OK) { if (verbosity >= -1) { printf("ICDecompressBegin() failed  lr=%" PRIdSZT "\n", lr); } bCannotDecode = true; }
+		}
 
-		if (verbosity >= -1 && bStdOutConsole)
-			printf("\r");
-		if (verbosity > 0 || (verbosity >= -1 && bStdOutConsole))
-			printf("%5d/%5d", i, asi.dwLength);
-		fflush(stdout);
+		for (unsigned int i = 0; i < asi.dwLength; i++)
+		{
+			double etime, dtime;
+			DWORD cbRead;
+			DWORD dwAviIndexFlag;
 
-		//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
-		//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
-		pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
-		if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
-		if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
+			if (verbosity >= -1 && bStdOutConsole)
+				printf("\r");
+			if (verbosity > 0 || (verbosity >= -1 && bStdOutConsole))
+				printf("%5d/%5d", i, asi.dwLength);
+			fflush(stdout);
 
-		FlushCache();
-		QueryPerformanceCounter(&liStartEncode);
-		dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihOrig, bufOrig.GetHeadGuardedBuffer(), NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
-		QueryPerformanceCounter(&liEndEncode);
-		if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
-		etime = (liEndEncode.QuadPart - liStartEncode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
-		enctime[i] = etime;
-		totalenctime += etime;
+			//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
+			//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
+			pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
+			if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
+			if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
+
+			FlushCache();
+			QueryPerformanceCounter(&liStartEncode);
+			dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihOrig, bufOrig.GetHeadGuardedBuffer(), NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
+			QueryPerformanceCounter(&liEndEncode);
+			if (dw != ICERR_OK) { printf("ICCompress() failed  dw=%08x\n", dw); break; }
+			etime = (liEndEncode.QuadPart - liStartEncode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
+			enctime[i] = etime;
+			totalenctime += etime;
+
+			if (!bEncodeOnly && !bCannotDecode)
+			{
+				FlushCache();
+				QueryPerformanceCounter(&liStartDecode);
+				dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihDecoded, bufDecoded.GetHeadGuardedBuffer());
+				QueryPerformanceCounter(&liEndDecode);
+				if (dw != ICERR_OK) { printf("ICDecompress() failed  dw=%08x\n", dw); break; }
+				dtime = (liEndDecode.QuadPart - liStartDecode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
+				dectime[i] = dtime;
+				totaldectime += dtime;
+			}
+
+			if (verbosity >= 0)
+			{
+				printf(" %10.6fms", etime);
+				if (!bEncodeOnly && !bCannotDecode)
+					printf(" %10.6fms", dtime);
+				printf(" %7dbytes (%4.1f%%) %s\n",
+					pbmihEncoded->biSizeImage, (double)pbmihEncoded->biSizeImage / (double)pbmihOrig->biSizeImage * 100.0,
+					(pbmihEncoded->biSizeImage == 0) ? "NUL" : (dwAviIndexFlag&AVIIF_KEYFRAME) ? "KEY" : "");
+			}
+			if (bCheckLossless && memcmp(bufOrig.GetHeadGuardedBuffer(), bufDecoded.GetHeadGuardedBuffer(), pbmihOrig->biSizeImage) != 0)
+			{
+				printf("frame #%d NOT LOSSLESS!!! - aborting\n", i);
+				break;
+			}
+			cbOrigTotal += pbmihOrig->biSizeImage;
+			cbEncodedTotal += pbmihEncoded->biSizeImage;
+			iskey[i] = ((dwAviIndexFlag&AVIIF_KEYFRAME) != 0);
+		}
+
+		ICCompressEnd(hicCompress);
+		ICClose(hicCompress);
 
 		if (!bEncodeOnly && !bCannotDecode)
 		{
-			FlushCache();
-			QueryPerformanceCounter(&liStartDecode);
-			dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihDecoded, bufDecoded.GetHeadGuardedBuffer());
-			QueryPerformanceCounter(&liEndDecode);
-			if (dw != ICERR_OK) { printf("ICDecompress() failed  dw=%08x\n", dw); break; }
-			dtime = (liEndDecode.QuadPart - liStartDecode.QuadPart) / (double)liFreq.QuadPart * 1000.0;
-			dectime[i] = dtime;
-			totaldectime += dtime;
+			ICDecompressEnd(hicDecompress);
+			ICClose(hicDecompress);
 		}
 
 		if (verbosity >= 0)
-		{
-			printf(" %10.6fms", etime);
-			if (!bEncodeOnly && !bCannotDecode)
-				printf(" %10.6fms", dtime);
-			printf(" %7dbytes (%4.1f%%) %s\n",
-				pbmihEncoded->biSizeImage, (double)pbmihEncoded->biSizeImage / (double)pbmihOrig->biSizeImage * 100.0,
-				(pbmihEncoded->biSizeImage == 0) ? "NUL" : (dwAviIndexFlag&AVIIF_KEYFRAME) ? "KEY" : "");
-		}
-		if (bCheckLossless && memcmp(bufOrig.GetHeadGuardedBuffer(), bufDecoded.GetHeadGuardedBuffer(), pbmihOrig->biSizeImage) != 0)
-		{
-			printf("frame #%d NOT LOSSLESS!!! - aborting\n", i);
-			break;
-		}
-		cbOrigTotal += pbmihOrig->biSizeImage;
-		cbEncodedTotal += pbmihEncoded->biSizeImage;
-		iskey[i] = ((dwAviIndexFlag&AVIIF_KEYFRAME) != 0);
-	}
+			printf("\n");
+		else if (verbosity >= -1 && bStdOutConsole)
+			printf("\r");
 
-	ICCompressEnd(hicCompress);
-	ICClose(hicCompress);
-
-	if (!bEncodeOnly && !bCannotDecode)
-	{
-		ICDecompressEnd(hicDecompress);
-		ICClose(hicDecompress);
-	}
-
-	AVIStreamRelease(pStream);
-
-	if (verbosity >= 0)
-		printf("\n");
-	else if (verbosity >= -1 && bStdOutConsole)
-		printf("\r");
-
-	if (verbosity >= -1)
-	{
-		printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
-			cbEncodedTotal, cbOrigTotal,
-			(double)cbEncodedTotal / (double)cbOrigTotal*100.0,
-			(double)cbOrigTotal / (double)cbEncodedTotal);
-	}
-	else
-	{
-		printf(",%6.4f", (double)cbOrigTotal / (double)cbEncodedTotal);
-	}
-
-
-	sort(enctime.begin(), enctime.end());
-	if (verbosity >= -1)
-		printf("Encode time: %fms/%df = %fms/f = %f fps\n", totalenctime, asi.dwLength, totalenctime/asi.dwLength, 1000.0*asi.dwLength/totalenctime);
-	else
-		printf(",%f", 1000.0*asi.dwLength / totalenctime);
-	if (verbosity > 0)
-	{
-		printf("    min  %f\n",  enctime[0]);
-		printf("    10%%  %f\n", enctime[(size_t)(enctime.size()*0.10)]);
-		printf("    25%%  %f\n", enctime[(size_t)(enctime.size()*0.25)]);
-		printf("    50%%  %f\n", enctime[(size_t)(enctime.size()*0.50)]);
-		printf("    75%%  %f\n", enctime[(size_t)(enctime.size()*0.75)]);
-		printf("    90%%  %f\n", enctime[(size_t)(enctime.size()*0.90)]);
-		printf("    max  %f\n",  enctime[(size_t)(enctime.size()-1)]);
-	}
-
-	if (!bEncodeOnly && !bCannotDecode)
-	{
-		sort(dectime.begin(), dectime.end());
 		if (verbosity >= -1)
-			printf("Decode time: %fms/%df = %fms/f = %f fps\n", totaldectime, asi.dwLength, totaldectime/asi.dwLength, 1000.0*asi.dwLength/totaldectime);
-		else
-			printf(",%f", 1000.0*asi.dwLength / totaldectime);
+		{
+			printf("Size: %I64d/%I64d (%6.3f%%, %6.4f)\n",
+				cbEncodedTotal, cbOrigTotal,
+				(double)cbEncodedTotal / (double)cbOrigTotal*100.0,
+				(double)cbOrigTotal / (double)cbEncodedTotal);
+		}
+
+
+		if (verbosity >= -1)
+			printf("Encode time: %fms/%df = %fms/f = %f fps\n", totalenctime, asi.dwLength, totalenctime/asi.dwLength, 1000.0*asi.dwLength/totalenctime);
 		if (verbosity > 0)
 		{
-			printf("    min  %f\n",  dectime[0]);
-			printf("    10%%  %f\n", dectime[(size_t)(dectime.size()*0.10)]);
-			printf("    25%%  %f\n", dectime[(size_t)(dectime.size()*0.25)]);
-			printf("    50%%  %f\n", dectime[(size_t)(dectime.size()*0.50)]);
-			printf("    75%%  %f\n", dectime[(size_t)(dectime.size()*0.75)]);
-			printf("    90%%  %f\n", dectime[(size_t)(dectime.size()*0.90)]);
-			printf("    max  %f\n",  dectime[(size_t)(dectime.size()-1)]);
+			sort(enctime.begin(), enctime.end());
+			printf("    min  %f\n", enctime[0]);
+			printf("    10%%  %f\n", enctime[(size_t)(enctime.size()*0.10)]);
+			printf("    25%%  %f\n", enctime[(size_t)(enctime.size()*0.25)]);
+			printf("    50%%  %f\n", enctime[(size_t)(enctime.size()*0.50)]);
+			printf("    75%%  %f\n", enctime[(size_t)(enctime.size()*0.75)]);
+			printf("    90%%  %f\n", enctime[(size_t)(enctime.size()*0.90)]);
+			printf("    max  %f\n",  enctime[(size_t)(enctime.size()-1)]);
 		}
+		encmeasure[iMeasure] = totalenctime;
 
-		vector<double> ratime(asi.dwLength);
-		double totalratime = 0;
-
-		for (unsigned int i = 0; i < asi.dwLength; i ++)
+		if (!bEncodeOnly && !bCannotDecode)
 		{
-			double t = 0;
-			for (int j = i; j >= 0; j--)
+			if (verbosity >= -1)
+				printf("Decode time: %fms/%df = %fms/f = %f fps\n", totaldectime, asi.dwLength, totaldectime/asi.dwLength, 1000.0*asi.dwLength/totaldectime);
+			if (verbosity > 0)
 			{
-				t += dectime[j];
-				if (iskey[j])
-					break;
+				sort(dectime.begin(), dectime.end());
+				printf("    min  %f\n", dectime[0]);
+				printf("    10%%  %f\n", dectime[(size_t)(dectime.size()*0.10)]);
+				printf("    25%%  %f\n", dectime[(size_t)(dectime.size()*0.25)]);
+				printf("    50%%  %f\n", dectime[(size_t)(dectime.size()*0.50)]);
+				printf("    75%%  %f\n", dectime[(size_t)(dectime.size()*0.75)]);
+				printf("    90%%  %f\n", dectime[(size_t)(dectime.size()*0.90)]);
+				printf("    max  %f\n",  dectime[(size_t)(dectime.size()-1)]);
 			}
-			ratime[i] = t;
-			totalratime += t;
-		}
+			decmeasure[iMeasure] = totaldectime;
 
-		sort(ratime.begin(), ratime.end());
-		if (verbosity >= -1)
-			printf("Random access time: %fms/f\n", totalratime/asi.dwLength);
-		else
-			printf(",%f", 1000.0*asi.dwLength / totaldectime);
-		if (verbosity > 0)
-		{
-			printf("    min  %f\n",  ratime[0]);
-			printf("    10%%  %f\n", ratime[(size_t)(ratime.size()*0.10)]);
-			printf("    25%%  %f\n", ratime[(size_t)(ratime.size()*0.25)]);
-			printf("    50%%  %f\n", ratime[(size_t)(ratime.size()*0.50)]);
-			printf("    75%%  %f\n", ratime[(size_t)(ratime.size()*0.75)]);
-			printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
-			printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
+			vector<double> ratime(asi.dwLength);
+			double totalratime = 0;
+
+			for (unsigned int i = 0; i < asi.dwLength; i++)
+			{
+				double t = 0;
+				for (int j = i; j >= 0; j--)
+				{
+					t += dectime[j];
+					if (iskey[j])
+						break;
+				}
+				ratime[i] = t;
+				totalratime += t;
+			}
+
+			if (verbosity >= -1)
+				printf("Random access time: %fms/f\n", totalratime/asi.dwLength);
+			if (verbosity > 0)
+			{
+				sort(ratime.begin(), ratime.end());
+				printf("    min  %f\n", ratime[0]);
+				printf("    10%%  %f\n", ratime[(size_t)(ratime.size()*0.10)]);
+				printf("    25%%  %f\n", ratime[(size_t)(ratime.size()*0.25)]);
+				printf("    50%%  %f\n", ratime[(size_t)(ratime.size()*0.50)]);
+				printf("    75%%  %f\n", ratime[(size_t)(ratime.size()*0.75)]);
+				printf("    90%%  %f\n", ratime[(size_t)(ratime.size()*0.90)]);
+				printf("    max  %f\n",  ratime[(size_t)(ratime.size()-1)]);
+			}
+			rameasure[iMeasure] = totalratime;
 		}
+		if (verbosity == -1)
+			printf("\n");
 	}
-	else if (bCannotDecode)
+
+	if (verbosity <= -2)
 	{
-		if (verbosity < -1)
-			printf(",-,-");
-	}
-	if (verbosity < -1)
+		std::sort(encmeasure.begin(), encmeasure.end());
+		std::sort(decmeasure.begin(), decmeasure.end());
+		std::sort(rameasure.begin(), rameasure.end());
+
+		double encavg = 0;
+		double decavg = 0;
+		double raavg = 0;
+		for (int i = (nMeasures - nMedians) / 2; i < (nMeasures + nMedians) / 2; ++i) {
+			encavg += encmeasure[i];
+			decavg += decmeasure[i];
+			raavg += rameasure[i];
+		}
+		encavg /= nMedians;
+		decavg /= nMedians;
+		raavg /= nMedians;
+
+		printf(",%6.4f", (double)cbOrigTotal / (double)cbEncodedTotal);
+		printf(",%f", 1000.0*asi.dwLength / encavg);
+		if (!bEncodeOnly && !bCannotDecode)
+		{
+			printf(",%f", 1000.0*asi.dwLength / decavg);
+			printf(",%f", 1000.0*asi.dwLength / raavg);
+		}
+		else if (bCannotDecode)
+		{
+			if (verbosity < -1)
+				printf(",-,-");
+		}
 		printf("\n");
+	}
 }
 
 int main(int argc, char **argv)
