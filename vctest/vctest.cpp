@@ -81,7 +81,7 @@ void usage(void)
 		"Video Codec Test, version " VERSION "\n"
 		"Copyright (C) 2008-2017 UMEZAWA Takeshi\n"
 		"Licensed under GNU General Public License version 2 or later.\n\n"
-		"usage: %s {-c|-e} [-qvH] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name> ...\n"
+		"usage: %s {-c|-e} [-qvHWF] [-a affinity_mask] [-f codec_fcc] [-k key_frame_rate] [-s codec_state_hexstring] <AVI file name> ...\n"
 		"  -a affinity_mask          Set process affinity mask\n"
 		"  -c                        Enable lossless checking\n"
 		"  -e                        Encode only\n"
@@ -91,6 +91,7 @@ void usage(void)
 		"  -m N,M                    run N measures and show average of median M measures"
 		"  -H                        Allocate buffers at high address\n"
 		"  -W                        Wait for enter key before benchmark\n"
+		"  -F                        Use old style cache flushing\n"
 		"  -q                        Quiet output   (Decrease verbosity)\n"
 		"  -v                        Verbose output (Increase verbosity)\n"
 		, getprogname());
@@ -103,6 +104,7 @@ bool bEncodeOnly = false;
 bool Hopt = 0;
 int verbosity = 0;
 bool Wopt = false;
+bool Fopt = false;
 DWORD cbState = 0;
 void *pState = NULL;
 LARGE_INTEGER liFreq;
@@ -115,7 +117,7 @@ void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cef:qvs:k:m:HW")) != -1)
+	while ((ch = getopt(argc, argv, "a:cef:qvs:k:m:HWF")) != -1)
 	{
 		switch (ch)
 		{
@@ -237,6 +239,9 @@ void ParseOption(int &argc, char **&argv)
 			break;
 		case 'W':
 			Wopt = true;
+			break;
+		case 'F':
+			Fopt = true;
 			break;
 		case 'q':
 			verbosity--;
@@ -440,7 +445,13 @@ void BenchmarkCodec(const char *filename)
 			if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
 			if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
 
-			FlushCache();
+			if (Fopt)
+				OldFlushCache();
+			else
+			{
+				FlushCache(bufOrig.GetHeadGuardedBuffer(), idx.second);
+				FlushCache(bufEncoded.GetHeadGuardedBuffer(), cbEncodedBuf);
+			}
 			QueryPerformanceCounter(&liStartEncode);
 			dw = ICCompress(hicCompress, (i == 0 || (nKeyFrameInterval != 0 && (i % nKeyFrameInterval) == 0)) ? ICCOMPRESS_KEYFRAME : 0, pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihOrig, bufOrig.GetHeadGuardedBuffer(), NULL, &dwAviIndexFlag, i, sizeof(bufEncoded), 0, NULL, NULL);
 			QueryPerformanceCounter(&liEndEncode);
@@ -451,7 +462,13 @@ void BenchmarkCodec(const char *filename)
 
 			if (!bEncodeOnly && !bCannotDecode)
 			{
-				FlushCache();
+				if (Fopt)
+					OldFlushCache();
+				else
+				{
+					FlushCache(bufEncoded.GetHeadGuardedBuffer(), cbEncodedBuf);
+					FlushCache(bufDecoded.GetHeadGuardedBuffer(), pbmihOrig->biSizeImage);
+				}
 				QueryPerformanceCounter(&liStartDecode);
 				dw = ICDecompress(hicDecompress, ((dwAviIndexFlag&AVIIF_KEYFRAME) ? 0 : ICDECOMPRESS_NOTKEYFRAME), pbmihEncoded, bufEncoded.GetHeadGuardedBuffer(), pbmihDecoded, bufDecoded.GetHeadGuardedBuffer());
 				QueryPerformanceCounter(&liEndDecode);
@@ -620,7 +637,9 @@ int main(int argc, char **argv)
 
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 
-	InitFlushCache();
+	if (Fopt)
+		InitOldFlushCache();
+
 	GetProcessAffinityMask(GetCurrentProcess(), &dwpProcessAffinityMask, &dwpSystemAffinityMask);
 	QueryPerformanceFrequency(&liFreq);
 	AVIFileInit();

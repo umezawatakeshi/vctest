@@ -3,18 +3,19 @@
 
 #include "stdafx.h"
 #include "FlushCache.h"
+#include "intrin.h"
 
 char *pRandomBuf;
 #define RANDOMBUFSIZE (16*1024*1024)
 
-void InitFlushCache(void)
+void InitOldFlushCache(void)
 {
 	pRandomBuf = (char *)VirtualAlloc(NULL, RANDOMBUFSIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
 	for (int i = 0; i < RANDOMBUFSIZE; i++)
 		pRandomBuf[i] = rand();
 }
 
-void FlushCache(void)
+void OldFlushCache(void)
 {
 	static volatile char ch;
 	DWORD_PTR dwpProcessAffinityMask, dwpSystemAffinityMask;
@@ -30,4 +31,18 @@ void FlushCache(void)
 
 	GetProcessAffinityMask(GetCurrentProcess(), &dwpProcessAffinityMask, &dwpSystemAffinityMask);
 	SetThreadAffinityMask(GetCurrentThread(), dwpProcessAffinityMask);
+}
+
+void FlushCache(const void* buf, size_t sz)
+{
+	if (sz == 0)
+		return;
+
+	const char* begin = (const char*)buf;
+	const char* end = begin + sz;
+	for (auto p = begin; p < end; p += 64 /* XXX */)
+		_mm_clflush(p);
+	_mm_clflush(end - 1);
+
+	_mm_sfence();
 }

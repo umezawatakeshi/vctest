@@ -3,5 +3,6 @@
 
 #pragma once
 
-void InitFlushCache(void);
-void FlushCache(void);
+void InitOldFlushCache(void);
+void OldFlushCache(void);
+void FlushCache(const void* buf, size_t sz);
