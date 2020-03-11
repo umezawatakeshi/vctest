@@ -3,6 +3,6 @@
 
 #pragma once
 
-void InitOldFlushCache(void);
+void InitFlushCache(bool bOldStyle);
 void OldFlushCache(void);
 void FlushCache(const void* buf, size_t sz);

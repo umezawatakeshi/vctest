@@ -637,9 +637,7 @@ int main(int argc, char **argv)
 
 	SetPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
 
-	if (Fopt)
-		InitOldFlushCache();
-
+	InitFlushCache(Fopt);
 	GetProcessAffinityMask(GetCurrentProcess(), &dwpProcessAffinityMask, &dwpSystemAffinityMask);
 	QueryPerformanceFrequency(&liFreq);
 	AVIFileInit();
