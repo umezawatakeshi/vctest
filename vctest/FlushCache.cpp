@@ -9,6 +9,7 @@ char *pRandomBuf;
 #define RANDOMBUFSIZE (16*1024*1024)
 
 bool bSupportCLFLUSHOPT = false;
+size_t cbStrideCLFLUSH = 64;
 
 void InitFlushCache(bool bOldStyle)
 {
@@ -23,6 +24,8 @@ void InitFlushCache(bool bOldStyle)
 		int result[4];
 		__cpuidex(result, 7, 0);
 		bSupportCLFLUSHOPT = result[1] & (1 << 23);
+		__cpuidex(result, 1, 0);
+		cbStrideCLFLUSH = ((result[1] >> 8) & 0xff) * 8;
 	}
 }
 
@@ -53,13 +56,13 @@ void FlushCache(const void* buf, size_t sz)
 	const char* end = begin + sz;
 	if (bSupportCLFLUSHOPT)
 	{
-		for (auto p = begin; p < end; p += 64 /* XXX */)
+		for (auto p = begin; p < end; p += cbStrideCLFLUSH)
 			_mm_clflushopt(p);
 		_mm_clflushopt(end - 1);
 	}
 	else
 	{
-		for (auto p = begin; p < end; p += 64 /* XXX */)
+		for (auto p = begin; p < end; p += cbStrideCLFLUSH)
 			_mm_clflush(p);
 		_mm_clflush(end - 1);
 	}
