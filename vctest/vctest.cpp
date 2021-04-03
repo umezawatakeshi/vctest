@@ -22,7 +22,7 @@ void FCC2String(char *buf, DWORD fcc)
 }
 
 HANDLE hFile;
-vector<pair<LARGE_INTEGER, DWORD> > aviindex;
+std::vector<std::pair<LARGE_INTEGER, DWORD> > aviindex;
 
 
 DWORD ScanSubChunk(void)
@@ -63,7 +63,7 @@ DWORD ScanSubChunk(void)
 		SetFilePointerEx(hFile, liZero, &liCurPos, FILE_CURRENT);
 		SetFilePointerEx(hFile, liLen, NULL, FILE_CURRENT);
 		if ((name & 0x0000ffff) == 0x3030)
-			aviindex.push_back(pair<LARGE_INTEGER, DWORD>(liCurPos, len));
+			aviindex.push_back(std::pair<LARGE_INTEGER, DWORD>(liCurPos, len));
 		len = liLen.LowPart;
 	}
 	return len + 8;
@@ -396,13 +396,13 @@ void BenchmarkCodec(const char *filename)
 		printf("\n");
 	}
 
-	vector<double> enctime(asi.dwLength);
-	vector<double> dectime(asi.dwLength);
-	vector<bool> iskey(asi.dwLength);
+	std::vector<double> enctime(asi.dwLength);
+	std::vector<double> dectime(asi.dwLength);
+	std::vector<bool> iskey(asi.dwLength);
 
-	vector<double> encmeasure(nMeasures);
-	vector<double> decmeasure(nMeasures);
-	vector<double> rameasure(nMeasures);
+	std::vector<double> encmeasure(nMeasures);
+	std::vector<double> decmeasure(nMeasures);
+	std::vector<double> rameasure(nMeasures);
 
 	CGuardedBuffer bufOrig(pbmihOrig->biSizeImage, Hopt);
 	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage, Hopt);
@@ -459,7 +459,7 @@ void BenchmarkCodec(const char *filename)
 
 			//hr = AVIStreamRead(pStream, i, 1, bufOrig, sizeof(bufOrig), &cbOrig, NULL);
 			//if (FAILED(hr)) { printf("AVIStreamRead() failed: %08X\n", hr); }
-			pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
+			std::pair<LARGE_INTEGER, DWORD> idx = aviindex[i];
 			if (!SetFilePointerEx(hFile, idx.first, NULL, FILE_BEGIN)) { printf("SetFilePointerEx() failed  GetLastError=%08x\n", GetLastError()); break; }
 			if (!ReadFile(hFile, bufOrig.GetHeadGuardedBuffer(), idx.second, &cbRead, NULL)) { printf("ReadFile() failed  GetLastError=%08x\n", GetLastError()); break; }
 
@@ -570,7 +570,7 @@ void BenchmarkCodec(const char *filename)
 			}
 			decmeasure[iMeasure] = totaldectime;
 
-			vector<double> ratime(asi.dwLength);
+			std::vector<double> ratime(asi.dwLength);
 			double totalratime = 0;
 
 			for (unsigned int i = 0; i < asi.dwLength; i++)
@@ -590,7 +590,7 @@ void BenchmarkCodec(const char *filename)
 				printf("Random access time: %fms/f\n", totalratime/asi.dwLength);
 			if (verbosity > 0)
 			{
-				sort(ratime.begin(), ratime.end());
+				std::sort(ratime.begin(), ratime.end());
 				printf("    min  %f\n", ratime[0]);
 				printf("    10%%  %f\n", ratime[(size_t)(ratime.size()*0.10)]);
 				printf("    25%%  %f\n", ratime[(size_t)(ratime.size()*0.25)]);

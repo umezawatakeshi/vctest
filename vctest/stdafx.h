@@ -13,6 +13,4 @@
 
 #include "myinttypes.h"
 
-using namespace std;
-
 #define VERSION "2.3.0"
