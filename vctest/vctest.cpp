@@ -71,7 +71,18 @@ DWORD ScanSubChunk(void)
 
 void ScanChunk(void)
 {
+	SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
 	while (ScanSubChunk() > 0)
+		/* NOTHING */;
+}
+
+void ReadWholeFile(HANDLE hFile)
+{
+	std::vector<char> buf(64 * 1024 * 1024);
+	DWORD cbRead;
+
+	SetFilePointer(hFile, 0, NULL, FILE_BEGIN);
+	while (ReadFile(hFile, &buf.front(), buf.size(), &cbRead, NULL) && cbRead > 0)
 		/* NOTHING */;
 }
 
@@ -92,6 +103,7 @@ void usage(void)
 		"  -H                        Allocate buffers at high address\n"
 		"  -W                        Wait for enter key before benchmark\n"
 		"  -F                        Use old style cache flushing\n"
+		"  -R                        Read the whole of file before benchmark\n"
 		"  -q                        Quiet output   (Decrease verbosity)\n"
 		"  -v                        Verbose output (Increase verbosity)\n"
 		, getprogname());
@@ -105,6 +117,7 @@ bool Hopt = 0;
 int verbosity = 0;
 bool Wopt = false;
 bool Fopt = false;
+bool Ropt = false;
 DWORD cbState = 0;
 void *pState = NULL;
 LARGE_INTEGER liFreq;
@@ -117,7 +130,7 @@ void ParseOption(int &argc, char **&argv)
 {
 	int ch;
 
-	while ((ch = getopt(argc, argv, "a:cef:qvs:k:m:HWF")) != -1)
+	while ((ch = getopt(argc, argv, "a:cef:qvs:k:m:HWFR")) != -1)
 	{
 		switch (ch)
 		{
@@ -242,6 +255,9 @@ void ParseOption(int &argc, char **&argv)
 			break;
 		case 'F':
 			Fopt = true;
+			break;
+		case 'R':
+			Ropt = true;
 			break;
 		case 'q':
 			verbosity--;
@@ -392,6 +408,8 @@ void BenchmarkCodec(const char *filename)
 	CGuardedBuffer bufDecoded(pbmihOrig->biSizeImage, Hopt);
 
 	hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+	if (Ropt)
+		ReadWholeFile(hFile);
 	ScanChunk();
 
 	for (int iMeasure = 0; iMeasure < nMeasures; ++iMeasure)
